@@ -1,8 +1,32 @@
 # Handover for a new session
 
-Written at the end of Stage 4. **Stage 5 has not been started.** The next task is to **verify Stage 4 on Railway** (section 6), not to build anything new.
+Updated 2026-11-07 after the Stage 4 decision review and the Stage 4 prototype verification on Railway. **Stage 5 has not been started and is not authorised.** Sections 1 to 8 below were written at the end of Stage 4 and are kept for reference; where they say Stage 4 is "not verified" or "awaiting confirmation", this section supersedes them. Read this file first, then `CLAUDE.md`. `DPIA_Template.docx` is git-ignored source material and must never be committed.
 
-Read this file first, then `CLAUDE.md`. Everything the project owner decided is in files in this repository except the items listed under "Requirements that existed only in the conversation" (section 1.3), which this handover now preserves.
+## 0. Current state
+
+- **Commit on `main` and running on Railway:** `12eb21a` ("Stage 4 display fixes…"). `/api/health` returned `{"app":"ok","database":"ok","commit":"12eb21a"}`. Recent commits: `f9f9384` (confirmed decisions and first display corrections), `8690065` (the previous handover).
+- **Decisions:** CD-28 to CD-35 are all confirmed by the project owner (scope, corrections and limitations are in `docs/content-decisions.md`). Implemented in this session: CD-30 reminder; CD-31 carry-forward of each measure's latest recorded status with "Status at decision" / "Latest recorded status"; CD-33 reuse of an existing viewer share plus owner-at-snapshot versus current-owner lines; "Finalised — Rejected" label; "Earlier screening cycle" opinion label; awaiting-DPO summary that follows the calculated outcome; records of earlier versions labelled with their version and as historical.
+- **Prototype checks completed on Railway (built-in browser, see `docs/verification.md`):**
+  - Deployment ACTIVE; log "2 migrations found … No pending migrations to apply" (the Stage 4 migration was applied by an earlier deployment).
+  - Test 1 (assignment boundary, CD-32) on "TEST Stage 4 verification (fictional)": 13 steps; several denied-edit checks are **UI only** (server refusal untested).
+  - Test 2 (pre-assessment-only path): screening, DPO decision with short opinion, owner approval, new revision 2.0; both version 1.0 snapshots showed the same fingerprints and page content before and after (**observed preservation, not proof of database-level immutability**).
+  - After deploying `12eb21a`: revision 2.0's Review page, section 3.10 and section 11.4 were opened. Earlier screening decision, DPO opinion and owner decision are labelled "Version 1.0 — earlier version, historical; does not apply to this version", and the draft shows "No decision recorded yet for this version" / "No owner decision is recorded yet".
+- **Test data kept on Railway:** "TEST Stage 4 verification (fictional)" (DPIA-2026-0004, now version 2.0 draft, version 1.0 finalised; submitted, so archive-only), "TEST Stage 3 verification (fictional)" (DPIA-2026-0003), and two earlier test drafts (DPIA-2026-0001 and -0002). Nothing was reset or reseeded.
+
+## 0.1 Remaining limitations (not verified)
+
+- **The full DPIA review path is untested on Railway:** full-assessment submission, DPO opinion, requests for changes, blocking issues, conditional approval with conditions and progress, rejection, amendments, ownership transfer, DPO reassignment, comment replies and resolution, "Reopen screening" and "Reopen for changes" were exercised only by local tests against an in-memory fake database. (On Railway only a DPO section comment was posted, in Test 1.)
+- **Server-side refusal of denied actions** was not tested on Railway; the checks that were made were UI-only (disabled or hidden controls) unless stated otherwise.
+- **Database immutability triggers** (snapshots, DPO opinions, owner decisions) and real-transaction behaviour were not exercised.
+- **The awaiting-DPO wording fix** is locally tested only: no assessment on Railway is in that state, and none was created or submitted for the check.
+- **Answer-by-answer preservation** of the Stage 3 test assessment across the Stage 4 migration is unverified (the earlier "20 of 133 answers" was an observation, not a baseline).
+- **No browser check on mobile**, and no accessibility pass.
+- **Not built:** notifications, reports and export, seeded scenarios, demo guide, glossary, AI wording demonstration, admin reset (Stage 5).
+- **Open backlog items** (not fixed, listed in `docs/backlog.md`): narrower correction of a recorded final owner decision (today it needs "Start review / update" and a fresh screening), internal subsection IDs in assignment history, default of "Keep me as a read-only viewer", "Save draft" enabled on read-only sections, comments not in the activity history, name field pre-fill in 1.1, and the earlier UI ideas.
+
+## 0.2 Next step
+
+Wait for the project owner's instruction. Stage 5 is **not authorised**; UI refinement is paused; the coursework feature-branch and pull-request exercise (including its footer change) must not be done unless explicitly requested. Verification is intentionally proportionate to a homework prototype: do not expand testing to every edge case without a new instruction. If asked to continue verification, the most valuable untested item is one run of the full-assessment review path on Railway (see 0.1).
 
 ## 1. Authoritative documents and where decisions live
 
@@ -66,7 +90,7 @@ Read this file first, then `CLAUDE.md`. Everything the project owner decided is 
 ## 2. Repository state
 
 - GitHub: `https://github.com/enelpitk/privacy-assessment-guide`, branch `main` (Railway deploys from it).
-- History: `11dab25` Stage 1; `edcca9d` Stage 1 review; `f633dad` Stage 2; `f24245a` collapsible navigation; `010e932` progressive disclosure; `d467fff` header save indicator and Owner item removed; `f66014c` numbering, density, sections 1.1–2.2; `86b8804` controllers page correction; `122f31e` Stage 3; `40d141a` Q7 repair and commit id on `/api/health`; `96d8f50` Stage 3 Railway verification record; **`5031588` Stage 4**.
+- History (later commits are in section 0): `11dab25` Stage 1; `edcca9d` Stage 1 review; `f633dad` Stage 2; `f24245a` collapsible navigation; `010e932` progressive disclosure; `d467fff` header save indicator and Owner item removed; `f66014c` numbering, density, sections 1.1–2.2; `86b8804` controllers page correction; `122f31e` Stage 3; `40d141a` Q7 repair and commit id on `/api/health`; `96d8f50` Stage 3 Railway verification record; **`5031588` Stage 4**.
 - Layout: `src/domain` (pure rules, workflow, permissions, snapshots), `src/content` (structured template definitions with stable IDs), `src/server` (use cases), `src/app` (routes and pages), `src/components/form` (client form, store, governance screens), `prisma/` (schema, migrations, seed), `tests/`, `docs/`, `scripts/start.mjs`.
 - Commands: `npm test`, `npm run typecheck`, `npm run build` (no database needed); `npm start` (Railway: migrate, optional seed, start). No local database, no local server.
 
