@@ -47,8 +47,14 @@ If an implementation choice conflicts with these, update the document deliberate
 - Screening thresholds are versioned template rules, not statutory thresholds. Unknown/"Not sure" never equals No.
 - Risk: missing scores are "Not assessed", never 0. Current residual reflects implemented measures only. Supervisory consultation is never triggered by inherent score alone.
 
-## Commands (update when scripts exist)
-- None yet. Stage 1 created documentation only. Planned: `npm run build`, `npm test`, `npm run db:migrate`, `npm run db:seed`, `npm run acceptance` (on demand against Railway).
+## Commands
+- `npm test` – Vitest: pure domain tests, inventory coverage, render smoke tests, client store, server save against an in-memory fake. No database, no server.
+- `npm run typecheck` – `tsc --noEmit`.
+- `npm run build` – `prisma generate` + `next build`. Must not need a database.
+- `npm start` – Railway start: `prisma migrate deploy`, optional one-time seed (`RUN_SEED_USERS=true`), then Next on `$PORT`.
+- `npm run db:migrate`, `npm run db:seed` – need `DATABASE_URL`; run by the start script on Railway, not locally.
+- Planned: `npm run acceptance` (on-demand HTTP acceptance tests against Railway).
+- Layout: `src/domain` (pure logic), `src/content` (structured template definitions, stable IDs), `src/server` (use cases), `src/app` (routes, pages), `src/components/form` (client form, autosave store). See `docs/verification.md` for what is and is not verified.
 
 ## Git workflow
 - Check the active branch (`main`) and the user's latest instructions before any commit or push.

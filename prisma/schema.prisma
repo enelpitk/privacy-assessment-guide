@@ -1,0 +1,259 @@
+// DPIA Guide - Stage 2 schema. See docs/architecture.md for the full design.
+// Fictional demo data only.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  OWNER
+  CONTRIBUTOR
+  DPO
+  ADMIN
+}
+
+enum Lifecycle {
+  DRAFT
+  IN_DPO_REVIEW
+  CHANGES_REQUESTED
+  AWAITING_OWNER_DECISION
+  AWAITING_CONDITIONS
+  FINALISED
+  ARCHIVED
+}
+
+enum ScreeningStatus {
+  NOT_SUBMITTED
+  AWAITING_DPO
+  DECIDED
+  INVALIDATED
+}
+
+enum AnswerState {
+  ANSWERED
+  UNANSWERED
+  NOT_APPLICABLE
+  NOT_SURE
+  COMPLETE_LATER
+}
+
+enum AssignmentStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum AccessKind {
+  SHARED_VIEW
+}
+
+enum EntityKind {
+  PARTY
+  DATA_SUBJECT
+  DATA_CATEGORY
+}
+
+enum VersionKind {
+  DRAFT
+  FINALISED
+}
+
+model Department {
+  id          String  @id @default(cuid())
+  name        String
+  groupEntity String
+  demoSeedKey String? @unique
+  users       User[]
+  assessments Assessment[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  displayName  String
+  jobTitle     String
+  roles        Role[]
+  departmentId String?
+  demoSeedKey  String?  @unique
+  createdAt    DateTime @default(now())
+
+  department   Department? @relation(fields: [departmentId], references: [id])
+  owned        Assessment[] @relation("Owner")
+  dpoFor       Assessment[] @relation("AssignedDpo")
+  assignments  Assignment[]
+  accesses     AssessmentAccess[]
+  states       UserAssessmentState[]
+}
+
+model Assessment {
+  id                  String          @id @default(cuid())
+  displayId           String          @unique
+  name                String
+  departmentId        String
+  ownerId             String
+  assignedDpoId       String
+  lifecycle           Lifecycle       @default(DRAFT)
+  screeningStatus     ScreeningStatus @default(NOT_SUBMITTED)
+  archivedAt          DateTime?
+  archivedFrom        Lifecycle?
+  everSubmitted       Boolean         @default(false)
+  currentVersionId    String?
+  previousAssessmentRef String?
+  nextReviewDate      DateTime?
+  demoSeedKey         String?         @unique
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  department  Department  @relation(fields: [departmentId], references: [id])
+  owner       User        @relation("Owner", fields: [ownerId], references: [id])
+  assignedDpo User        @relation("AssignedDpo", fields: [assignedDpoId], references: [id])
+  versions    AssessmentVersion[]
+  accesses    AssessmentAccess[]
+  assignments Assignment[]
+  events      Event[]
+  states      UserAssessmentState[]
+
+  @@index([ownerId])
+  @@index([assignedDpoId])
+  @@index([lifecycle])
+}
+
+model AssessmentVersion {
+  id                String      @id @default(cuid())
+  assessmentId      String
+  versionNumber     String
+  kind              VersionKind @default(DRAFT)
+  templateVersion   String
+  revisionReason    String?
+  changeDescription String?
+  changeCategories  String[]
+  carriedFromVersionId String?
+  createdById       String
+  createdAt         DateTime    @default(now())
+
+  assessment Assessment     @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  records    RecordItem[]
+  fields     ResponseField[]
+  entities   Entity[]
+
+  @@unique([assessmentId, versionNumber])
+}
+
+// A repeatable record (purpose, party row, recipient, risk, measure ...).
+model RecordItem {
+  id          String    @id @default(cuid())
+  versionId   String
+  collection  String
+  parentId    String?
+  ordering    Int
+  revision    Int       @default(1)
+  createdById String
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
+
+  version AssessmentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([versionId, collection])
+}
+
+// One answer. recordId is "" for fields that are not inside a repeatable record.
+model ResponseField {
+  id           String      @id @default(cuid())
+  versionId    String
+  fieldId      String
+  recordId     String      @default("")
+  value        Json?
+  state        AnswerState @default(ANSWERED)
+  rationale    String?
+  revision     Int         @default(1)
+  lastEditorId String
+  lastEditedAt DateTime    @default(now())
+
+  version AssessmentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@unique([versionId, fieldId, recordId])
+  @@index([versionId])
+}
+
+// Shared entity (party, data subject category, data category) reused across sections.
+model Entity {
+  id          String     @id @default(cuid())
+  versionId   String
+  kind        EntityKind
+  name        String
+  revision    Int        @default(1)
+  createdById String
+  createdAt   DateTime   @default(now())
+  deletedAt   DateTime?
+
+  version AssessmentVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([versionId, kind])
+}
+
+model AssessmentAccess {
+  id           String     @id @default(cuid())
+  assessmentId String
+  userId       String
+  kind         AccessKind
+  grantedById  String
+  grantedAt    DateTime   @default(now())
+  revokedAt    DateTime?
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  user       User       @relation(fields: [userId], references: [id])
+
+  @@index([assessmentId])
+  @@index([userId])
+}
+
+// Assignment records exist so permissions can be enforced now; the assignment UI is Stage 4.
+model Assignment {
+  id              String           @id @default(cuid())
+  assessmentId    String
+  assigneeId      String
+  subsectionIds   String[]
+  taskDescription String
+  deadline        DateTime?
+  status          AssignmentStatus @default(PENDING)
+  createdById     String
+  createdAt       DateTime         @default(now())
+  completedAt     DateTime?
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  assignee   User       @relation(fields: [assigneeId], references: [id])
+
+  @@index([assessmentId])
+  @@index([assigneeId])
+}
+
+model UserAssessmentState {
+  userId         String
+  assessmentId   String
+  lastSubsection String
+  updatedAt      DateTime @updatedAt
+
+  user       User       @relation(fields: [userId], references: [id])
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@id([userId, assessmentId])
+}
+
+// Significant events only (no per-keystroke logging).
+model Event {
+  id           String   @id @default(cuid())
+  assessmentId String
+  versionId    String?
+  actorId      String
+  type         String
+  payload      Json?
+  createdAt    DateTime @default(now())
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId, createdAt])
+}

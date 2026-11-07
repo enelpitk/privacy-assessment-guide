@@ -17,7 +17,7 @@ The production build must not query the database. Prisma Client is generated at 
 
 ## 2. Demo identity
 
-- "Enter demo as…" sets a signed, HTTP-only cookie holding a demo user ID. No password, no verification. A visible banner states this is not authentication.
+- "Enter demo as…" sets an HTTP-only cookie holding a demo user ID. The cookie is deliberately **unsigned** (Stage 2 decision): identity is not authentication, anyone may pick any demo identity, and a signature would add a secret to manage without adding security. No password, no verification. The pages state that this is not authentication.
 - The server resolves the user from the cookie on every request. Roles are never accepted from the client.
 - Seed users (all fictional): Owner 1, Owner 2 (process owners), Contributor (IT/security), DPO A, DPO B, Demo administrator. A user may hold several functional roles (a `roles` set on the user, such as owner + contributor).
 - Per-assessment capacity is derived, not stored on the user: owner of this assessment, contributor on this assessment (active assignment), assigned DPO, other DPO (view/comment), administrator.
