@@ -5,6 +5,9 @@
 - Stack: **Next.js (App Router), TypeScript, Tailwind CSS, PostgreSQL, Prisma**.
 - Educational demo for one fictional organisation, **Harbour Financial Group** (Bank, Insurance, Asset Management). Not production-ready and not a legal certification.
 
+## Start here (new session)
+- `docs/handover.md` – current state, what is verified, and the next task. Then `docs/original-specification.md` (the verbatim original specification).
+
 ## Durable decisions (read these before implementing)
 - `docs/source-inventory.md` – source-to-application inventory with stable field IDs (authoritative mapping).
 - `docs/architecture.md` – layering, data model, server-side permission matrix, workflow transitions, change classes, concurrency, test plan.
