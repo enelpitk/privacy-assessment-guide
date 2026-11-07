@@ -81,11 +81,9 @@ describe("render smoke test: every subsection renders", () => {
 });
 
 describe("progressive disclosure", () => {
-  it("shows the real identifier and owner compactly, never 'Pending' for them", () => {
+  it("shows the real identifier compactly, never 'Pending' for it", () => {
     const html = render("A1", pageStub());
     expect(html).toContain("DPIA-2026-0001");
-    expect(html).toContain("Alex Rowan");
-    expect(html).not.toMatch(/Assessment identifier[^<]*<\/span><strong>[^<]*<\/strong>[\s\S]{0,200}Pending/);
     expect(html).not.toContain("Generated automatically");
   });
 
@@ -131,16 +129,21 @@ describe("progressive disclosure", () => {
     expect(html).toContain("Answer options");
   });
 
-  it("puts routine edit details behind 'Edit details' and shows no routine per-field save chip", () => {
+  it("shows no routine 'Saved' badge or 'Last edited by' text, even when the data exists", () => {
     const page = pageStub({
       fields: { "A.description|": { value: "x", state: "ANSWERED", rationale: null, revision: 2, editorName: "Priya Nandi", lastEditedAt: "2026-11-07T10:00:00.000Z" } },
     });
     const html = render("A1", page).replace(/<!-- -->/g, "");
-    const visible = html.replace(/<details[\s\S]*?<\/details>/g, "");
-    expect(html).toContain("Edit details");
-    expect(html).toContain("Last edited by Priya Nandi");
-    expect(visible).not.toContain("Last edited by");
-    expect(visible).not.toContain("Nothing saved yet");
+    expect(html).not.toContain("Last edited by");
+    expect(html).not.toContain("Edit details");
+    expect(html).not.toContain("Priya Nandi");
+    expect(html).not.toContain("Nothing saved yet");
+  });
+
+  it("does not render an Owner item in the questionnaire", () => {
+    const html = render("A1", pageStub());
+    expect(html).not.toContain("process, system or service owner");
+    expect(html).not.toContain("Pending");
   });
 
   it("shows the pending note once per subsection, not on every pending field", () => {

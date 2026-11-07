@@ -69,7 +69,7 @@ Subsection IDs are stable and are the unit of assignment and navigation.
 | ID | Source item | Kind | App location | Notes |
 |---|---|---|---|---|
 | A.processingName | Name of the processing | Q | A1 | |
-| A.owner | Owner (process, system or service owner responsible) | Q | A1 | Bound to the assessment owner (demo user); transfer via ownership-transfer action, not free edit |
+| A.owner | Owner (process, system or service owner responsible) | Q | Assessment header (not a questionnaire item) | The owner is the real `Assessment.ownerId` relationship, never inferred from a role. Shown in the header; exported in the report and JSON (`responses["A.owner"]`, taken from the owner relationship). Changed only by the recorded ownership-transfer action (Stage 4) |
 | A.description | General description, brief summary | Q | A1 | |
 | A.reason.new | Reason: New processing | C | A2 | Multi-select |
 | A.reason.changed | Reason: Changed processing | C | A2 | |

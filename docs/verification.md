@@ -32,7 +32,7 @@ Everything in the table below is still unverified on Railway unless stated here.
 | Resume last location, navigation guard, unsaved-change warning | Yes | Store tests (flush behaviour) | Not verified | `beforeunload` and navigation prompts untested in a browser |
 | Responsive layout, keyboard and screen-reader behaviour | Partly | Not tested | Not verified | Written with labels, fieldsets, focus styles; no audit done |
 | Health endpoint `/api/health` | Yes | Built | Limited manual check: ok/ok | See the manual verification table |
-| Progressive disclosure in the form (guidance, examples, original wording, edit details and answer options behind labelled controls; one save indicator; compact identifier/owner) | Yes | Render tests (90 tests total), build | Not verified | Not seen in a browser; essential qualifications are kept visible by an explicit flag per field |
+| Progressive disclosure in the form (guidance, examples, original wording and answer options behind labelled controls; no routine per-field Saved/last-edited text; one save indicator in the header; no Owner item in the questionnaire) | Yes | Render tests (92 tests total), build | Not verified | Not seen in a browser. Editor names and timestamps are still stored and loaded, just not shown. Owner is mapped to `A.owner` in the inventory and will be exported from the owner relationship (Stage 5) |
 | Collapsible navigation panel (preference kept in the browser, not assessment data) | Yes | Toggle label/ARIA test; build | Not verified | Default open on desktop, collapsed on mobile; not seen in a browser by me |
 
 ## Not built yet (clearly shown as pending in the UI)

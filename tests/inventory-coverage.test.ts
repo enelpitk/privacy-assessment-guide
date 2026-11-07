@@ -83,6 +83,11 @@ describe("source inventory coverage (automated, inventory -> definitions)", () =
     expect(bad).toEqual([]);
   });
 
+  it("the owner item stays mapped to the inventory without being a questionnaire field", () => {
+    expect(fieldIndex.has("A.owner")).toBe(false);
+    expect(definedIds().has("A.owner")).toBe(true);
+  });
+
   it("field IDs are unique and every field has a change class", () => {
     for (const loc of fieldIndex.values()) {
       expect(["SUBSTANTIVE", "PROGRESS", "ADMINISTRATIVE"]).toContain(changeClassOf(loc.def));

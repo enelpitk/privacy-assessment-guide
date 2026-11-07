@@ -474,8 +474,6 @@ function StatePanel({
 function FieldMeta({ f }: { f: FieldState | undefined }) {
   const { store } = useStoreCtx();
   if (!f) return null;
-  const routine =
-    f.status === "dirty" ? "Unsaved changes" : f.status === "saving" ? "Saving…" : f.baseRevision > 0 ? "Saved" : "Nothing saved yet";
   return (
     <div className="mt-1 text-xs text-ink-soft" aria-live="polite">
       {f.status === "failed" || f.status === "rejected" || f.status === "conflict" ? (
@@ -489,14 +487,6 @@ function FieldMeta({ f }: { f: FieldState | undefined }) {
             </button>
           ) : null}
         </div>
-      ) : null}
-      {f.editorName && f.lastEditedAt ? (
-        <details className="mt-1">
-          <summary className="w-fit cursor-pointer">Edit details</summary>
-          <p className="mt-1">
-            Last edited by {f.editorName}, {formatTime(f.lastEditedAt)}. Status: {routine}.
-          </p>
-        </details>
       ) : null}
     </div>
   );

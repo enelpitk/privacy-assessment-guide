@@ -42,6 +42,9 @@ export const STAGE_A: StageDef = {
         "TPL.intro.mandatory",
         "TPL.intro.when",
         "TPL.intro.timing",
+        // Owner is not a questionnaire item: it is the assessment's owner relationship, shown in the
+        // header and exported from it (report + JSON) under this inventory ID.
+        "A.owner",
       ],
       help: {
         explain:
@@ -59,18 +62,6 @@ export const STAGE_A: StageDef = {
             inline: "A short, recognisable name, for example the service or process name.",
           },
         }),
-        field(
-          "A.owner",
-          "Owner",
-          "computed",
-          {
-            computed: "owner",
-            sourceText: "Owner (process, system or service owner responsible for this activity)",
-            workflow: "system",
-            workflowNote:
-              "The owner is the person who created the assessment. Ownership transfer is a recorded action (arrives in Stage 4).",
-          },
-        ),
         longtext(
           "A.description",
           "General description - brief summary of what the processing involves",
