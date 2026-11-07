@@ -19,14 +19,16 @@ export async function buildAccessCtx(
       where: { assessmentId: assessment.id, userId: user.id, revokedAt: null },
     }),
   ]);
-  const active = assignments.filter((a) => a.status !== "COMPLETED");
+  // Cancelled assignments give no access; completed ones keep read access but no editing rights.
+  const live = assignments.filter((a) => a.status !== "CANCELLED");
+  const active = live.filter((a) => a.status !== "COMPLETED");
   return {
     ownerId: assessment.ownerId,
     assignedDpoId: assessment.assignedDpoId,
     lifecycle: assessment.lifecycle as Lifecycle,
     screeningStatus: assessment.screeningStatus as ScreeningStatus,
     assignedSubsections: [...new Set(active.flatMap((a) => a.subsectionIds))],
-    isAssignee: assignments.length > 0,
+    isAssignee: live.length > 0,
     sharedViewer: Boolean(shared),
   };
 }

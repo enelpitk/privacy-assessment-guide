@@ -48,7 +48,7 @@ If an implementation choice conflicts with these, update the document deliberate
 - Risk: missing scores are "Not assessed", never 0. Current residual reflects implemented measures only. Supervisory consultation is never triggered by inherent score alone.
 
 ## Commands
-- `npm test` – Vitest: pure domain tests, inventory coverage, render smoke tests, client store, server save against an in-memory fake. No database, no server.
+- `npm test` – Vitest: pure domain tests (rules, workflow, permissions), inventory coverage, render tests, client store, and server flows against an in-memory fake database (`tests/fakeDb.ts`). No database, no server.
 - `npm run typecheck` – `tsc --noEmit`.
 - `npm run build` – `prisma generate` + `next build`. Must not need a database.
 - `npm start` – Railway start: `prisma migrate deploy`, optional one-time seed (`RUN_SEED_USERS=true`), then Next on `$PORT`.

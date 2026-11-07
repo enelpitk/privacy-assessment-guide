@@ -13,5 +13,5 @@ export function useModel() {
     parentId: r.parentId,
     ordering: r.ordering,
   }));
-  return buildModel(store.responses(), rows);
+  return buildModel(store.responses(), rows, store.path);
 }

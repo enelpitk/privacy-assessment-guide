@@ -16,6 +16,7 @@ import {
 } from "@/domain/guidance";
 import { interpretYesNo } from "@/domain/model";
 import { isEmptyValue } from "@/domain/validation";
+import { FieldComments } from "./Comments";
 import { useStoreCtx, useStoreRev } from "./context";
 import type { FieldState } from "./store";
 
@@ -138,6 +139,7 @@ export function FieldBlock({
         <HelpRequest def={def} recordId={recordId} disabled={disabled} />
         {f?.status === "conflict" ? <ConflictPanel def={def} f={f} recordId={recordId} /> : null}
         <FieldMeta f={f} />
+        <FieldComments subsectionId={subsectionId} fieldId={def.id} recordId={recordId} />
       </div>
     );
   }
@@ -157,14 +159,7 @@ export function FieldBlock({
       </div>
     );
   }
-  if (def.workflow) {
-    return (
-      <div className="border-l-2 border-slate-300 pl-3">
-        <p className="font-medium">{def.label}</p>
-        <p className="text-sm text-ink-soft">Pending — recorded in a later stage.</p>
-      </div>
-    );
-  }
+  if (def.workflow) return null; // recorded in Review and decisions, not edited as an answer
   if (def.type === "computed") {
     return <ComputedField def={def} recordId={recordId} evalCtx={evalCtx} />;
   }
@@ -365,6 +360,7 @@ export function FieldBlock({
       ) : null}
       {f?.status === "conflict" ? <ConflictPanel def={def} f={f} recordId={recordId} /> : null}
       <FieldMeta f={f} />
+      <FieldComments subsectionId={subsectionId} fieldId={def.id} recordId={recordId} />
       {!perm.ok ? <p className="help-text mt-1">Read-only: {perm.reason}</p> : null}
     </>
   );

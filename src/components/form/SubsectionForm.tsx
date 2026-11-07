@@ -27,6 +27,9 @@ import { isEmptyValue } from "@/domain/validation";
 import { fieldKey } from "@/lib/types";
 import { useStoreCtx, useStoreRev } from "./context";
 import { FieldBlock, useFormat } from "./Fields";
+import { SectionComments } from "./Comments";
+import { GovStatus } from "./Governance";
+import { postAction, useCollab } from "./collab";
 import { ConsultFlag, RiskExamplesPicker, RiskSummary } from "./Risk";
 import { Q5Table, ScreeningOutcomes, SuggestionBlock } from "./Screening";
 import { useModel } from "./useModel";
@@ -52,8 +55,6 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
   );
   if (!sub) return <p>Unknown section.</p>;
   const stage = STAGES.find((s) => s.id === sub.stage)!;
-  const pendingNote = sub.items.find((i) => (i.kind === "field" || i.kind === "collection") && i.workflow && i.workflow !== "system");
-  const pendingText = pendingNote && (pendingNote.kind === "field" || pendingNote.kind === "collection") ? pendingNote.workflowNote : undefined;
   const active = isSubsectionActive(sub, model.ctx);
   const canStructure = canChangeRecords(page.actor, page.ctx, sub.id);
 
@@ -66,11 +67,7 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
         <h2 className="mt-0.5 text-lg font-semibold">
           {subsectionLabel(sub.id)} {sub.title}
         </h2>
-        {pendingText ? (
-          <p className="mt-3 max-w-prose2 border-l-2 border-slate-300 pl-3 text-sm text-ink-soft" role="status">
-            <strong>Pending:</strong> {pendingText}
-          </p>
-        ) : null}
+        <CarriedForward subsectionId={sub.id} />
 
         {!active ? (
           <div className="mt-4 rounded-md border border-slate-300 bg-white p-3">
@@ -96,6 +93,7 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
           <Items items={sub.items} recordId="" subsectionId={sub.id} evalCtx={model.ctx} />
         </form>
 
+        <SectionComments subsectionId={sub.id} />
         <nav className="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4" aria-label="Section navigation">
           {prev ? (
             <a
@@ -270,16 +268,7 @@ function CollectionEditor({
   const perm = canChangeRecords(page.actor, page.ctx, subsectionId);
   const nested = parentRecordId !== "";
 
-  if (col.workflow) {
-    return (
-      <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
-        <p className="label">{col.label}</p>
-        <p className="help-text mt-1">
-          <strong>Pending:</strong> {col.workflowNote}
-        </p>
-      </div>
-    );
-  }
+  if (col.workflow) return null; // recorded in Review and decisions
 
   const titleOf = (recordId: string) => {
     if (!col.titleField) return "";
@@ -496,6 +485,8 @@ function InfoView({ info }: { info: InfoDef }): ReactNode {
       return <RiskSummary />;
     case "consultFlag":
       return <ConsultFlag />;
+    case "govStatus":
+      return <GovStatus kind={(info.ref ?? "screening") as "screening"} />;
     case "pending":
       return (
         <div className="rounded-md border border-dashed border-slate-400 bg-slate-50 p-3">
@@ -539,7 +530,7 @@ function InfoView({ info }: { info: InfoDef }): ReactNode {
                   <td className="py-1 pr-3">Not completed yet</td>
                   <td className="py-1 pr-3">{v.note}</td>
                   <td className="py-1 pr-3">{v.authorName}</td>
-                  <td className="py-1">Pending — recorded in the DPO review (Stage 4)</td>
+                  <td className="py-1">See Review and decisions and History and versions</td>
                 </tr>
               ))}
             </tbody>
@@ -690,4 +681,39 @@ function measureOverdue(store: { get: (f: string, r: string) => { value: unknown
   const due = store.get("J.risk.due", recordId)?.value;
   const status = store.get("J.risk.status", recordId)?.value;
   return typeof due === "string" && due !== "" && due < new Date().toISOString().slice(0, 10) && status !== "COMPLETED";
+}
+
+/** A section carried forward into a new revision stays "please review" until the owner or assignee confirms it. */
+function CarriedForward({ subsectionId }: { subsectionId: string }) {
+  const { page, store } = useStoreCtx();
+  const { unreviewed, markReviewed, can } = useCollab();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  if (!unreviewed.has(subsectionId)) return null;
+  const allowed = can("confirmReviewed") && (page.actor.id === page.ctx.ownerId || page.ctx.assignedSubsections.includes(subsectionId));
+  return (
+    <div className="mt-3 max-w-prose2 rounded-md border border-amber-400 bg-amber-50 p-3 text-sm" role="status">
+      <p className="font-semibold">Carried forward — please review</p>
+      <p>These answers were copied from the previous version. Check them, change what is out of date, then confirm.</p>
+      {allowed ? (
+        <button
+          type="button"
+          className="btn-secondary mt-2"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setMsg(null);
+            await store.flush();
+            const r = await postAction(page.assessment.id, { action: "confirmReviewed", subsectionId });
+            setBusy(false);
+            if (!r.ok) return setMsg(r.data.error ?? "Could not confirm.");
+            markReviewed(subsectionId);
+          }}
+        >
+          I have reviewed this section
+        </button>
+      ) : null}
+      {msg ? <p role="alert" className="mt-1 font-medium text-red-800">{msg}</p> : null}
+    </div>
+  );
 }

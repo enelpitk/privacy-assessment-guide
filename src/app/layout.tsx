@@ -44,6 +44,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                   Assessments
                 </Link>
               ) : null}
+              {user?.roles.includes("ADMIN") ? (
+                <Link href="/admin" className="btn-link">
+                  Administration
+                </Link>
+              ) : null}
             </div>
             {user ? (
               <IdentityBar name={user.displayName} roles={user.roles.map((r) => ROLE_LABEL[r] ?? r).join(", ")} />

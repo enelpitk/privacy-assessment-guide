@@ -46,6 +46,41 @@ enum AssignmentStatus {
   PENDING
   IN_PROGRESS
   COMPLETED
+  CANCELLED
+}
+
+enum ScreeningPath {
+  OPEN
+  FULL
+  PRE_ONLY
+}
+
+enum SnapshotKind {
+  SCREENING_SUBMITTED
+  FULL_SUBMITTED
+  FINALISED
+}
+
+enum ScreeningDecisionKind {
+  PROCEED_FULL
+  PRE_ASSESSMENT_SUFFICIENT
+}
+
+enum OpinionCategory {
+  NO_OBJECTIONS
+  RECOMMENDATIONS
+  OBJECTIONS_REMAIN
+}
+
+enum OwnerDecisionKind {
+  APPROVED
+  CONDITIONALLY_APPROVED
+  REJECTED
+}
+
+enum ThreadState {
+  OPEN
+  RESOLVED
 }
 
 enum AccessKind {
@@ -98,6 +133,7 @@ model Assessment {
   assignedDpoId       String
   lifecycle           Lifecycle       @default(DRAFT)
   screeningStatus     ScreeningStatus @default(NOT_SUBMITTED)
+  screeningPath       ScreeningPath   @default(OPEN)
   archivedAt          DateTime?
   archivedFrom        Lifecycle?
   everSubmitted       Boolean         @default(false)
@@ -116,6 +152,14 @@ model Assessment {
   assignments Assignment[]
   events      Event[]
   states      UserAssessmentState[]
+  snapshots          Snapshot[]
+  screeningDecisions ScreeningDecision[]
+  opinions           DpoOpinion[]
+  blockingIssues     BlockingIssue[]
+  ownerDecisions     OwnerDecision[]
+  conditions         Condition[]
+  progressRecords    ProgressRecord[]
+  threads            CommentThread[]
 
   @@index([ownerId])
   @@index([assignedDpoId])
@@ -256,4 +300,181 @@ model Event {
   assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
 
   @@index([assessmentId, createdAt])
+}
+
+// ---------------------------------------------------------------- Stage 4: collaboration and governance
+
+// Immutable. A database trigger rejects UPDATE and DELETE (see the migration).
+model Snapshot {
+  id          String       @id @default(cuid())
+  assessmentId String
+  versionId   String
+  kind        SnapshotKind
+  takenAt     DateTime     @default(now())
+  takenById   String
+  contentHash String
+  payload     Json
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId, versionId])
+}
+
+// Append-only; supersededAt is set only when the screening is reopened (history is kept).
+model ScreeningDecision {
+  id                     String                @id @default(cuid())
+  assessmentId           String
+  versionId              String
+  snapshotId             String
+  dpoId                  String
+  decision               ScreeningDecisionKind
+  rationale              String
+  exceptionJustification String?
+  mitigationControls     String?
+  advice                 String?
+  screeningIndicatedFull Boolean
+  supersededAt           DateTime?
+  createdAt              DateTime              @default(now())
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId, versionId])
+}
+
+// Immutable (trigger). An amendment is a new row that supersedes an earlier one.
+model DpoOpinion {
+  id            String          @id @default(cuid())
+  assessmentId  String
+  versionId     String
+  snapshotId    String
+  dpoId         String
+  kind          String // SCREENING or FULL
+  category      OpinionCategory
+  opinionText   String
+  recommendations String?
+  supersedesId  String?
+  createdAt     DateTime        @default(now())
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId, versionId])
+}
+
+model BlockingIssue {
+  id              String    @id @default(cuid())
+  assessmentId    String
+  versionId       String
+  subsectionId    String?
+  reason          String
+  raisedById      String
+  raisedAt        DateTime  @default(now())
+  status          String    @default("OPEN") // OPEN or RESOLVED
+  resolvedById    String?
+  resolvedAt      DateTime?
+  resolutionNote  String?
+  ownerResponse   String?
+  ownerRespondedAt DateTime?
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId, versionId])
+}
+
+// Immutable (trigger). Corrections are new rows.
+model OwnerDecision {
+  id                 String            @id @default(cuid())
+  assessmentId       String
+  versionId          String
+  reviewedSnapshotId String
+  ownerId            String
+  decision           OwnerDecisionKind
+  rationale          String
+  departsFromDpo     Boolean           @default(false)
+  departureRationale String?
+  supersedesId       String?
+  createdAt          DateTime          @default(now())
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId, versionId])
+}
+
+model Condition {
+  id                 String    @id @default(cuid())
+  assessmentId       String
+  versionId          String
+  decisionId         String
+  description        String
+  responsibleUserId  String?
+  responsibleText    String?
+  deadline           DateTime?
+  confirmedAt        DateTime?
+  confirmedById      String?
+  confirmationNote   String?
+  createdAt          DateTime  @default(now())
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId, versionId])
+}
+
+// Append-only progress on a condition or a risk measure; never rewrites a snapshot.
+model ProgressRecord {
+  id           String   @id @default(cuid())
+  assessmentId String
+  versionId    String
+  itemType     String // CONDITION or MEASURE
+  itemId       String
+  status       String?
+  note         String
+  authorId     String
+  createdAt    DateTime @default(now())
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId, itemType, itemId])
+}
+
+model CommentThread {
+  id           String      @id @default(cuid())
+  assessmentId String
+  versionId    String
+  subsectionId String
+  fieldId      String?
+  recordId     String?
+  state        ThreadState @default(OPEN)
+  createdById  String
+  createdAt    DateTime    @default(now())
+  resolvedById String?
+  resolvedAt   DateTime?
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  comments   Comment[]
+
+  @@index([assessmentId, versionId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  threadId  String
+  authorId  String
+  body      String
+  parentId  String?
+  isReview  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  thread CommentThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId])
+}
+
+// Carried-forward subsections of a new revision stay "please review" until the owner confirms them.
+model ReviewMark {
+  id            String    @id @default(cuid())
+  versionId     String
+  subsectionId  String
+  confirmedById String?
+  confirmedAt   DateTime?
+
+  @@unique([versionId, subsectionId])
 }

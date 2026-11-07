@@ -2,6 +2,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { SUBSECTIONS, collectionIndex } from "@/content";
 import { StoreCtx } from "@/components/form/context";
+import { CollabProvider } from "@/components/form/collab";
 import { AssessmentStore } from "@/components/form/store";
 import { SubsectionForm } from "@/components/form/SubsectionForm";
 import { pageStub } from "./helpers";
@@ -11,7 +12,9 @@ function render(sub: string, page: PageData) {
   const store = new AssessmentStore(page);
   return renderToString(
     <StoreCtx.Provider value={{ store, page, navigate: async () => undefined }}>
-      <SubsectionForm subsectionId={sub} />
+      <CollabProvider page={page}>
+        <SubsectionForm subsectionId={sub} />
+      </CollabProvider>
     </StoreCtx.Provider>,
   );
 }
@@ -69,8 +72,12 @@ describe("render smoke test: every subsection renders", () => {
 
   it("states what is pending rather than implying it works", () => {
     expect(render("C8", pageStub())).not.toContain("Coming in Stage 3"); // implemented in Stage 3
-    expect(render("C9", pageStub())).toContain("Pending:");
-    expect(render("K4", pageStub())).toContain("Pending:");
+    // recorded decisions are now real workflow panels, not placeholders
+    for (const sub of ["C9", "K1", "K4"]) {
+      const html = render(sub, pageStub());
+      expect(html, sub).not.toContain("Pending");
+      expect(html, sub).toContain("Loading review status");
+    }
   });
 
   it("shows the original question and the inverted-Yes explanation for necessity question 2", () => {
@@ -147,9 +154,12 @@ describe("progressive disclosure", () => {
     expect(html).not.toContain("Pending");
   });
 
-  it("shows the pending note once per subsection, not on every pending field", () => {
-    const html = render("C9", pageStub());
-    expect(html.match(/<strong>Pending:<\/strong>/g)).toHaveLength(1);
+  it("shows no input controls for recorded decisions inside the questionnaire", () => {
+    for (const sub of ["C9", "K1", "K4"]) {
+      const html = render(sub, pageStub());
+      expect(html, sub).not.toContain("<textarea");
+      expect(html, sub).not.toContain('type="radio"');
+    }
   });
 });
 

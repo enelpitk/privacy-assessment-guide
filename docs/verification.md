@@ -59,12 +59,22 @@ Everything in the table below is still unverified on Railway unless stated here.
 | Progressive disclosure in the form (guidance, examples, original wording and answer options behind labelled controls; no routine per-field Saved/last-edited text; one save indicator in the header; no Owner item in the questionnaire) | Yes | Render tests (92 tests total), build | Not verified | Not seen in a browser. Editor names and timestamps are still stored and loaded, just not shown. Owner is mapped to `A.owner` in the inventory and will be exported from the owner relationship (Stage 5) |
 | Stage 3: explainable screening suggestions, Q5 per-sub-question logic, independent DPIA/TIA indications, unresolved list, provisional Q6 flag, suggestion snapshots | Yes | 41 screening/risk tests + render + store + server-save (fake DB) tests | Not verified | Pure rules tested thoroughly; UI never seen in a browser |
 | Stage 3: guided risk register (example starting points that must be confirmed, measures, calculated inherent/current residual/target, labelled matrix, overdue labels, consultation prompt) and open-questions summary | Yes | Domain + render tests | Not verified | Overdue notifications are not built yet (labels only) |
+| Stage 4: assignments and explicit sharing; comments (replies, resolve/reopen); ownership transfer and DPO reassignment with audit history; screening gate and full-review gate with atomic snapshots, locks and server-enforced permissions; DPO opinions, amendments and blocking issues; owner decisions, conditions and separate progress; reopen and renewed review; new revisions with carried-forward review; draft deletion, archive and restore; path activation without deleting answers | Yes | 46 server-flow tests against an in-memory fake database, pure workflow/permission tests, UI tests by role; type check; build | **Not verified** | The migration has not been applied to PostgreSQL; the DB-level immutability triggers, cascading deletion, the enum addition and all transaction behaviour are untested on a real database. No browser check |
 | Visible numbering 1–11 / 1.1, compact typography, simplified sections 1.1, 1.2, 2.1, 2.2 (help-request control, compact grouped records, controller select) | Yes | Domain + render tests (105 tests total), type check, build | Not verified | Not seen in a browser; typography, spacing and mobile usability need a visual check |
 | Collapsible navigation panel (preference kept in the browser, not assessment data) | Yes | Toggle label/ARIA test; build | Not verified | Default open on desktop, collapsed on mobile; not seen in a browser by me |
 
+## Stage 4 items that specifically need Railway verification
+
+- Migration `20261108000000_stage4_governance` applies cleanly at startup on the existing database and keeps all existing assessments and answers (the test assessment included).
+- The triggers reject UPDATE and DELETE on `Snapshot`, `DpoOpinion` and `OwnerDecision`.
+- Atomic guarded submissions (the conditional `UPDATE ... WHERE lifecycle = ...`) under real transactions.
+- Cascading deletion of a never-submitted draft (and removal of its review marks), and that a submitted assessment cannot be deleted.
+- A full review cycle across two browser sessions and four identities (owner, assigned DPO, other DPO, contributor), including the admin DPO reassignment page.
+- A new revision keeps the finalised version intact and copies answers, records and shared entries consistently.
+- Snapshot viewer pages, the review/team/history screens, the comment threads and the carried-forward review flow in a real browser.
+
 ## Not built yet (clearly shown as pending in the UI)
 
-- **Stage 4:** assignments UI, comments, submission snapshots, DPO review and opinions, owner decision and conditions, revisions, archive/delete, ownership transfer, event history, review-date logging.
 - **Stage 5:** notifications, reports and JSON export, seeded scenarios, demo guide, wording demonstration, glossary, admin reset, accessibility pass.
 - **Stage 6:** Railway deployment and acceptance testing.
 

@@ -9,6 +9,7 @@ import { buildModel, evaluateAssessment, evaluateSubsection, stageProgress } fro
 import { LIFECYCLE_LABEL, SCREENING_LABEL } from "@/lib/labels";
 import type { PageData } from "@/lib/types";
 import { StoreCtx, useStoreCtx, useStoreRev } from "./context";
+import { CollabProvider, useCollab } from "./collab";
 import { AssessmentStore } from "./store";
 import { useModel } from "./SubsectionForm";
 
@@ -27,7 +28,7 @@ export function Shell({ page, current, children }: { page: PageData; current: st
         if (sub) {
           // Show open items on navigation, without blocking it.
           const rows = store.records.map((r) => ({ id: r.id, collection: r.collection, parentId: r.parentId, ordering: r.ordering }));
-          const res = evaluateSubsection(sub, buildModel(store.responses(), rows));
+          const res = evaluateSubsection(sub, buildModel(store.responses(), rows, store.path));
           if (res.active && res.gaps.length > 0) {
             try {
               sessionStorage.setItem(
@@ -70,6 +71,7 @@ export function Shell({ page, current, children }: { page: PageData; current: st
   const panel = useNavPanel();
   return (
     <StoreCtx.Provider value={{ store, page, navigate }}>
+      <CollabProvider page={page}>
       <AssessmentHeader />
       <NavToggle open={panel.open} toggle={panel.toggle} />
       <div className={`mx-auto grid max-w-[88rem] gap-6 px-4 py-4 ${panel.columns}`}>
@@ -79,6 +81,7 @@ export function Shell({ page, current, children }: { page: PageData; current: st
           {children}
         </main>
       </div>
+      </CollabProvider>
     </StoreCtx.Provider>
   );
 }
@@ -159,6 +162,7 @@ function AssessmentHeader() {
             <span className="chip-neutral">{LIFECYCLE_LABEL[a.lifecycle] ?? a.lifecycle}</span>
             <span className="chip-neutral">{SCREENING_LABEL[a.screeningStatus] ?? a.screeningStatus}</span>
             <span className="chip-neutral">Version {a.versionNumber}</span>
+            {page.path === "PRE_ONLY" ? <span className="chip-neutral">Pre-assessment only</span> : null}
             <span className="text-ink-soft">Owner: {a.ownerName}</span>
             <span className="text-ink-soft">DPO: {a.dpoName}</span>
           </p>
@@ -188,6 +192,26 @@ function SideNav({ current, visibility }: { current: string | null; visibility: 
           Overview and progress
         </Link>
       </p>
+      <ul className="mb-3 space-y-0.5">
+        {[
+          ["review", "Review and decisions"],
+          ["team", "Team and sharing"],
+          ["history", "History and versions"],
+        ].map(([slug, label]) => (
+          <li key={slug}>
+            <a
+              className="btn-link"
+              href={`/assessments/${page.assessment.id}/${slug}`}
+              onClick={(e) => {
+                e.preventDefault();
+                void navigate(`/assessments/${page.assessment.id}/${slug}`);
+              }}
+            >
+              {label}
+            </a>
+          </li>
+        ))}
+      </ul>
       <ol className="space-y-3">
         {STAGES.map((st) => {
           const p = progress.find((x) => x.id === st.id)!;
@@ -387,8 +411,6 @@ export function Overview() {
         <h2 className="text-lg font-semibold">Not available yet</h2>
         <p className="help-text mt-1">These parts of the guide are built in later stages. Nothing on this page implies they work today.</p>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-          <li>Suggested screening answers and automatic screening outcomes, and the risk matrix with your own risks (Stage 3).</li>
-          <li>Assignments, comments, submission for review, the DPO’s decisions, the owner’s decision, conditions, revisions and archiving (Stage 4).</li>
           <li>Notifications, the printable report, JSON export, the demo guide, the glossary and the wording demonstration (Stage 5).</li>
         </ul>
       </section>
@@ -399,6 +421,8 @@ export function Overview() {
 function OpenQuestionsCard({ result }: { result: ReturnType<typeof evaluateAssessment> }) {
   const { page, navigate } = useStoreCtx();
   const oq = openQuestions(result);
+  const { threads } = useCollab();
+  const openThreads = threads.filter((t) => t.state === "OPEN");
   const go = (id: string) => `/assessments/${page.assessment.id}/s/${id}`;
   const kindText = { NOT_SURE: "Not sure", COMPLETE_LATER: "Complete later", HELP_REQUEST: "Help requested", INCOMPLETE: "Incomplete" } as const;
   return (
@@ -430,6 +454,28 @@ function OpenQuestionsCard({ result }: { result: ReturnType<typeof evaluateAsses
           {oq.unresolved.length > 40 ? <li className="text-ink-soft">…and {oq.unresolved.length - 40} more.</li> : null}
         </ul>
       )}
+      {openThreads.length ? (
+        <div className="mt-3 text-sm">
+          <p className="font-medium">{openThreads.length} unresolved comment thread{openThreads.length === 1 ? "" : "s"}</p>
+          <ul className="mt-1 space-y-0.5">
+            {openThreads.slice(0, 15).map((t) => (
+              <li key={t.id}>
+                <a
+                  className="btn-link"
+                  href={go(t.subsectionId)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void navigate(go(t.subsectionId));
+                  }}
+                >
+                  {subsectionLabel(t.subsectionId)} {subsectionById.get(t.subsectionId)?.title}
+                </a>
+                : {t.comments[0]?.body.slice(0, 80)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <p className="mt-3 text-sm">
         <strong>{oq.incompleteTotal}</strong> applicable item{oq.incompleteTotal === 1 ? " is" : "s are"} still unanswered.
       </p>

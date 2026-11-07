@@ -6,6 +6,8 @@ import { TEMPLATE_VERSION, subsectionById } from "@/content";
 import { canCreateAssessment, isEligibleDpo, type Role } from "@/domain/permissions";
 import type { AnswerState } from "@/domain/conditions";
 import { loadAccessible } from "./access";
+import { loadThreads } from "./governanceData";
+import type { Path } from "@/domain/workflow";
 import type { ClientField, PageData } from "@/lib/types";
 import { fieldKey } from "@/lib/types";
 
@@ -105,7 +107,7 @@ export async function listAssessments(user: CurrentUser, f: RegisterFilters) {
     : {
         OR: [
           { ownerId: user.id },
-          { assignments: { some: { assigneeId: user.id } } },
+          { assignments: { some: { assigneeId: user.id, status: { not: "CANCELLED" } } } },
           { accesses: { some: { userId: user.id, revokedAt: null } } },
         ],
       };
@@ -117,7 +119,7 @@ export async function listAssessments(user: CurrentUser, f: RegisterFilters) {
   if (f.view === "assigned") {
     and.push({
       OR: [
-        { assignments: { some: { assigneeId: user.id } } },
+        { assignments: { some: { assigneeId: user.id, status: { not: "CANCELLED" } } } },
         { accesses: { some: { userId: user.id, revokedAt: null } } },
       ],
     });
@@ -187,6 +189,10 @@ export async function loadPageData(user: CurrentUser, assessmentId: string): Pro
       prisma.assessmentAccess.findMany({ where: { assessmentId, revokedAt: null }, select: { userId: true } }),
     ]);
   if (!owner || !dpo || !dept || !version) throw new HttpError(500, "Assessment data is incomplete.");
+  const [threads, marks] = await Promise.all([
+    loadThreads(versionId, assessmentId),
+    prisma.reviewMark.findMany({ where: { versionId, confirmedAt: null } }),
+  ]);
 
   const editorIds = [...new Set(rows.map((r) => r.lastEditorId))];
   const editors = await prisma.user.findMany({ where: { id: { in: editorIds } } });
@@ -250,6 +256,9 @@ export async function loadPageData(user: CurrentUser, assessmentId: string): Pro
       note: v.versionNumber === "1.0" ? "Initial draft" : (v.changeDescription ?? ""),
     })),
     lastSubsection: state?.lastSubsection ?? null,
+    path: assessment.screeningPath as Path,
+    threads,
+    unreviewed: marks.map((m) => m.subsectionId),
   };
 }
 

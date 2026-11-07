@@ -196,3 +196,13 @@ Report and JSON are assembled from a selected `Snapshot`/version by a pure funct
 1. **Local**: Vitest on `src/domain` (screening, risk, completeness, permissions matrix, state machine, change-class coverage, inventory coverage, concurrency decision logic, report assembly, notification dedupe keys, reset selection). Command `npm test`, run with `npm run build` before each push.
 2. **On demand against Railway**: HTTP acceptance script with a unique run ID and fictional records; checks real route authorisation and persistence; cleanup per lifecycle rules (delete eligible drafts, archive submitted); never auto-run on deploy; never runs the seeded reset.
 3. **Manual browser checks** on Railway. Reset DB-level safety stays "not yet verified".
+
+## Stage 4 implementation notes
+
+- **One action endpoint.** `POST /api/assessments/[id]/actions` takes a validated union of actions (`src/server/actionSchema.ts`). `src/server/governance.ts` re-checks the role (`canWorkflow`), the state (`checkState`) and the content rules for every call. The UI only chooses which buttons to show.
+- **Guarded atomic changes.** Each state change is a conditional `updateMany` on the lifecycle, screening status and path read at the start, inside one transaction with the snapshot and event writes. A concurrent change makes the guard fail with a 409 and nothing is written.
+- **Snapshots** are rows with a content hash. `Snapshot`, `DpoOpinion` and `OwnerDecision` also have database triggers that reject UPDATE and DELETE; the code never attempts either. Amendments and corrections are new rows.
+- **Screening path.** `Assessment.screeningPath` is OPEN until the DPO decides, FULL after "proceed", PRE_ONLY after "pre-assessment sufficient". The path only changes which sections are active; no answer is deleted.
+- **Locks.** `canEditField` already blocks substantive edits during review and after DPO review (the owner must reopen), and locks sections 1 to 3 once the screening is with the DPO or decided. Reopening the screening supersedes the decision and unlocks them.
+- **Revisions** copy entries, records and answers into a new version with fresh ids (references remapped), create "please review" marks for every section, and start from a fresh screening. Approvals and opinions stay with the earlier version.
+- **Not in this stage:** notifications (Stage 5). Events are recorded, so notifications can be generated from them later.

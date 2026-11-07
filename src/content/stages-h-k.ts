@@ -371,8 +371,8 @@ export const STAGE_J: StageDef = {
 
 // ---------------------------------------------------------------- K
 
-const REVIEW_NOTE = "Recorded by the assigned DPO. This workflow arrives in Stage 4.";
-const DECISION_NOTE = "Recorded by the process owner after DPO review. This workflow arrives in Stage 4.";
+const REVIEW_NOTE = "Recorded by the assigned DPO in Review and decisions.";
+const DECISION_NOTE = "Recorded by the process owner in Review and decisions.";
 
 export const STAGE_K: StageDef = {
   id: "K",
@@ -385,9 +385,11 @@ export const STAGE_K: StageDef = {
       title: "DPO review",
       summary: "The DPO’s opinion, conclusions and recommendations.",
       items: [
+        info("K.gov", "govStatus", { ref: "opinion", added: true }),
         longtext("K.dpo.opinion", "DPO's opinion, conclusions, and recommendations regarding this processing activity", {
           workflow: "dpo-review",
           workflowNote: REVIEW_NOTE,
+          hidden: true,
         }),
         choice(
           "K.dpo.category",
@@ -397,12 +399,13 @@ export const STAGE_K: StageDef = {
             opt("RECOMMENDATIONS", "Recommendations / conditions"),
             opt("OBJECTIONS", "Objections remain"),
           ],
-          { added: true, workflow: "dpo-review", workflowNote: REVIEW_NOTE },
+          { added: true, workflow: "dpo-review", workflowNote: REVIEW_NOTE, hidden: true },
         ),
         longtext("K.dpo.blocking", "Blocking issues, with reasons", {
           added: true,
           workflow: "dpo-review",
           workflowNote: REVIEW_NOTE,
+          hidden: true,
         }),
       ],
     },
@@ -446,6 +449,7 @@ export const STAGE_K: StageDef = {
       title: "Final decision and conditions",
       summary: "The owner’s decision after DPO review.",
       items: [
+        info("K.govd", "govStatus", { ref: "decision", added: true }),
         choice(
           "K.decision",
           "Final decision",
@@ -454,11 +458,12 @@ export const STAGE_K: StageDef = {
             opt("CONDITIONAL", "CONDITIONALLY APPROVED: the processing may proceed only once the conditions have been met.", "K.decision.conditional"),
             opt("REJECTED", "REJECTED: the processing must be abandoned.", "K.decision.rejected"),
           ],
-          { added: true, workflow: "owner-decision", workflowNote: DECISION_NOTE },
+          { added: true, workflow: "owner-decision", workflowNote: DECISION_NOTE, hidden: true },
         ),
         longtext("K.decision.reasons", "Reasons for the decision", {
           workflow: "owner-decision",
           workflowNote: DECISION_NOTE,
+          hidden: true,
         }),
         collection(
           "K.decision.condition",

@@ -552,13 +552,14 @@ export const STAGE_C: StageDef = {
           "The DPO may require a full DPIA regardless of the screening outcome, for example where significant risks are identified or where a code of conduct or national law mandates it.",
       },
       items: [
+        info("C.gov", "govStatus", { ref: "screening", added: true }),
         longtext("C.exception.rationale", "Rationale and mitigation controls (if full DPIA is deemed unnecessary despite ‘Yes’ answers)", {
           workflow: "dpo-screening",
-          workflowNote: "Recorded by the assigned DPO. This workflow arrives in Stage 4.",
+          hidden: true,
         }),
         longtext("C.dpo.advice", "DPO advice or recommendations", {
           workflow: "dpo-screening",
-          workflowNote: "Recorded by the assigned DPO. This workflow arrives in Stage 4.",
+          hidden: true,
         }),
         choice(
           "C.dec",
@@ -570,16 +571,16 @@ export const STAGE_C: StageDef = {
           {
             added: true,
             workflow: "dpo-screening",
-            workflowNote: "Recorded by the assigned DPO. This workflow arrives in Stage 4.",
+            hidden: true,
           },
         ),
         text("C.dec.dpoName", "DPO name", {
           workflow: "dpo-screening",
-          workflowNote: "Filled from the assigned DPO when the decision is recorded (Stage 4).",
+          hidden: true,
         }),
         date("C.dec.date", "Date", {
           workflow: "dpo-screening",
-          workflowNote: "Filled when the decision is recorded (Stage 4).",
+          hidden: true,
         }),
       ],
     },

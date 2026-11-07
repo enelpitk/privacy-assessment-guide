@@ -9,3 +9,8 @@ UI refinement is paused. These are ideas noted so far; none is being implemented
 - Reordering records currently reloads the page; make it update in place.
 - Suggestion list for the Q7 recipient-location hint is a short illustrative list; replace with a maintained EU/EEA lookup if the project continues.
 - The Q5 sub-question table's Result column is clipped at about 1000px width with the navigation open (it scrolls sideways); tighten the table or let it wrap. Seen during Railway verification.
+- Per-question "Comment" links add a line under every field; consider showing them on hover/focus or only where comments exist.
+- Notifications for assignments, comments, changes requested, review completed and overdue items (Stage 5).
+- Comparing two versions side by side; the snapshot viewer shows one snapshot at a time.
+- Measure progress records are shown on Review and decisions; consider showing the latest progress inside the risk register too.
+- The questionnaire's review-status blocks fetch governance data separately; they could share one request with the page.

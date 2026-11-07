@@ -32,6 +32,9 @@ export function pageStub(over: Partial<PageData> = {}): PageData {
     people: [{ id: "o1", name: "Alex Rowan", role: "Process owner" }],
     versions: [{ versionNumber: "1.0", createdAt: "2026-11-07T10:00:00.000Z", authorName: "Alex Rowan", note: "Initial draft" }],
     lastSubsection: null,
+    path: "OPEN",
+    threads: [],
+    unreviewed: [],
     ...over,
   };
 }

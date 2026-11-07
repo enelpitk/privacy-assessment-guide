@@ -179,8 +179,11 @@ export async function saveChanges(
     if (ch.fieldId === "A.processingName" && typeof ch.value === "string" && ch.value.trim()) {
       await prisma.assessment.update({ where: { id: assessment.id }, data: { name: ch.value.trim().slice(0, 200) } });
     }
-    if (ch.fieldId === "K.review.interval" || ch.fieldId === "K.review.periodic") {
+    if (ch.fieldId === "K.review.interval" || ch.fieldId === "K.review.periodic" || ch.fieldId === "K.review.noSchedule") {
       await syncNextReview(assessment.id, versionId);
+      await prisma.event.create({
+        data: { assessmentId: assessment.id, versionId, actorId: user.id, type: "REVIEW_DATE_CHANGED", payload: { fieldId: ch.fieldId } },
+      });
     }
   }
 

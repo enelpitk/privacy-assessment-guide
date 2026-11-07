@@ -9,6 +9,7 @@ import {
 } from "@/content";
 import { evaluate, type AnswerState, type EvalCtx, type Resp } from "./conditions";
 import { isEmptyValue } from "./validation";
+import { inactiveForPath } from "./workflow";
 
 export interface RespRow {
   fieldId: string;
@@ -30,7 +31,11 @@ export interface ModelData {
   records: RecordRow[];
 }
 
-export function buildModel(responses: RespRow[], liveRecords: RecordRow[]): ModelData {
+export function buildModel(
+  responses: RespRow[],
+  liveRecords: RecordRow[],
+  path: "OPEN" | "FULL" | "PRE_ONLY" = "OPEN",
+): ModelData {
   const live = new Map(liveRecords.map((r) => [r.id, r]));
   const byKey = new Map<string, Resp>();
   const byField = new Map<string, Resp[]>();
@@ -49,6 +54,7 @@ export function buildModel(responses: RespRow[], liveRecords: RecordRow[]): Mode
     anyRecord: (f) => byField.get(f) ?? [],
     recordsOf: (c) => liveRecords.filter((r) => r.collection === c).map((r) => r.id),
     parentOf: (id) => live.get(id)?.parentId ?? undefined,
+    path,
   };
   return { ctx, records: liveRecords };
 }
@@ -64,6 +70,7 @@ export function recordsFor(
 }
 
 export function isSubsectionActive(sub: SubsectionDef, ctx: EvalCtx): boolean {
+  if (inactiveForPath(sub.id, sub.stage, ctx.path ?? "OPEN")) return false; // answers are kept, just not applicable
   return sub.activeWhen ? evaluate(sub.activeWhen, ctx) : true;
 }
 

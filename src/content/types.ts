@@ -125,6 +125,7 @@ export type InfoBlock =
   | "q5table"
   | "riskSummary"
   | "consultFlag"
+  | "govStatus"
   | "pending";
 
 export interface InfoDef {
@@ -138,7 +139,7 @@ export interface InfoDef {
   added?: boolean;
   /** For block "pending": the stage that will deliver this function. */
   pendingStage?: number;
-  /** For block "suggestion": the screening question ("q1" ... "q7"). */
+  /** For block "suggestion": the screening question ("q1" ... "q7"). For "govStatus": "screening" | "opinion" | "decision". */
   ref?: string;
 }
 

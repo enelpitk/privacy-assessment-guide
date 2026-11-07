@@ -40,6 +40,8 @@ export interface EvalCtx {
   /** Live record ids of a collection. */
   recordsOf(collection: string): string[];
   parentOf(recordId: string): string | undefined;
+  /** Screening path: OPEN until the DPO decides; PRE_ONLY deactivates the full-assessment sections. */
+  path?: "OPEN" | "FULL" | "PRE_ONLY";
 }
 
 function resolve(

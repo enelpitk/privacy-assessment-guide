@@ -1,5 +1,7 @@
 import type { AnswerState } from "@/domain/conditions";
 import type { AccessCtx, Actor } from "@/domain/permissions";
+import type { Path } from "@/domain/workflow";
+import type { ThreadView } from "./govTypes";
 
 export interface ClientField {
   value: unknown;
@@ -63,6 +65,11 @@ export interface PageData {
   people: PersonOption[];
   versions: VersionRow[];
   lastSubsection: string | null;
+  /** Screening path. PRE_ONLY deactivates the full-assessment sections (their answers are kept). */
+  path: Path;
+  threads: ThreadView[];
+  /** Sections of this version still marked "Carried forward — please review". */
+  unreviewed: string[];
 }
 
 export const fieldKey = (fieldId: string, recordId: string) => `${fieldId}|${recordId}`;

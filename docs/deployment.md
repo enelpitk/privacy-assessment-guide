@@ -22,6 +22,10 @@ The build (`npm run build`) runs `prisma generate` and `next build`. It does **n
 3. **Redeploy** the service after the latest commit builds. Previous failures were because the repository had no application yet.
 4. **Public domain.** Service → Settings → Networking → Generate Domain. Send me the URL only.
 
+## Stage 4 migration
+
+The second migration (`20261108000000_stage4_governance`) is additive: new tables, one new enum value and database triggers that make submitted snapshots, DPO opinions and owner decisions immutable. It is applied automatically by `prisma migrate deploy` at startup. It does not touch existing rows, so existing assessments and the test data are kept. There is no reseed. If it fails, `/api/health` reports `not-migrated` and the deploy logs show why (connection strings are hidden).
+
 ## Adding the demo users (explicit, one time)
 
 There is no shell in the dashboard, so the seed is run by the start script when you ask for it:

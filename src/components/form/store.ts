@@ -87,6 +87,7 @@ export class AssessmentStore {
   records: ClientRecord[];
   entities: ClientEntity[];
   readonly assessmentId: string;
+  readonly path: PageData["path"];
   lastSavedAt: Date | null = null;
   lastError: string | null = null;
   private listeners = new Set<() => void>();
@@ -96,6 +97,7 @@ export class AssessmentStore {
 
   constructor(initial: PageData) {
     this.assessmentId = initial.assessment.id;
+    this.path = initial.path ?? "OPEN";
     this.records = [...initial.records];
     this.entities = [...initial.entities];
     for (const [key, f] of Object.entries(initial.fields)) this.load(key, f);
