@@ -3,7 +3,7 @@ import { redirect, unstable_rethrow } from "next/navigation";
 import { DbProblemView } from "@/components/DbProblem";
 import { prisma } from "@/lib/db";
 import { describeDbProblem } from "@/lib/errors";
-import { LIFECYCLE_LABEL, SCREENING_LABEL } from "@/lib/labels";
+import { LIFECYCLE_LABEL, lifecycleLabel, SCREENING_LABEL } from "@/lib/labels";
 import { getCurrentUser } from "@/lib/session";
 import { listAssessments, type RegisterView } from "@/server/assessments";
 
@@ -194,7 +194,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
                       </td>
                       <td className="p-2">{r.ownerName}</td>
                       <td className="p-2">
-                        <span className="chip-neutral">{LIFECYCLE_LABEL[r.lifecycle] ?? r.lifecycle}</span>
+                        <span className="chip-neutral">{lifecycleLabel(r.lifecycle, r.rejected)}</span>
                         <span className="help-text mt-1 block">{SCREENING_LABEL[r.screeningStatus]}</span>
                       </td>
                       <td className="p-2">{r.versionNumber}</td>
@@ -220,7 +220,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
                     <dt className="text-ink-soft">Owner</dt>
                     <dd>{r.ownerName}</dd>
                     <dt className="text-ink-soft">Status</dt>
-                    <dd>{LIFECYCLE_LABEL[r.lifecycle] ?? r.lifecycle}</dd>
+                    <dd>{lifecycleLabel(r.lifecycle, r.rejected)}</dd>
                     <dt className="text-ink-soft">Version</dt>
                     <dd>{r.versionNumber}</dd>
                     <dt className="text-ink-soft">Modified</dt>

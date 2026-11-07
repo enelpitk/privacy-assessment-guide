@@ -535,6 +535,24 @@ async function startRevision(user: CurrentUser, l: Loaded, i: Extract<ActionInpu
         lastEditorId: f.lastEditorId,
         lastEditedAt: f.lastEditedAt,
       }));
+    // CD-31: carry each measure's latest recorded status (not only "Completed") into the new draft as an ordinary,
+    // editable answer. With no recorded status the copied register status stays. Progress history itself is not copied.
+    const oldProgress = await tx.progressRecord.findMany({ where: { assessmentId: l.assessment.id, versionId: l.versionId, itemType: "MEASURE" }, orderBy: { createdAt: "asc" } });
+    let carriedStatuses = 0;
+    for (const m of oldRecords.filter((r) => r.collection === "J.risk.measure")) {
+      const latest = [...oldProgress].reverse().find((p) => p.itemId === m.id && p.status);
+      if (!latest?.status) continue;
+      const newRecordId = recordMap.get(m.id)!;
+      const existing = copy.find((f) => f.fieldId === "J.risk.status" && f.recordId === newRecordId);
+      if (existing) {
+        existing.value = latest.status;
+        existing.state = "ANSWERED";
+        existing.rationale = null;
+      } else {
+        copy.push({ versionId: nv.id, fieldId: "J.risk.status", recordId: newRecordId, value: latest.status, state: "ANSWERED", rationale: null, revision: 1, lastEditorId: user.id, lastEditedAt: new Date() });
+      }
+      carriedStatuses++;
+    }
     if (copy.length) await tx.responseField.createMany({ data: copy });
     // Every section is "Carried forward — please review" until the owner confirms it.
     await tx.reviewMark.createMany({ data: SUBSECTIONS.map((s) => ({ versionId: nv.id, subsectionId: s.id })) });
@@ -545,7 +563,7 @@ async function startRevision(user: CurrentUser, l: Loaded, i: Extract<ActionInpu
     });
     if (res.count !== 1) throw new HttpError(409, "The assessment was changed by someone else. Reload and try again.");
     await tx.event.create({
-      data: { assessmentId: l.assessment.id, versionId: nv.id, actorId: user.id, type: "NEW_REVISION", payload: { from: l.versionId, versionNumber: number, categories: i.categories } },
+      data: { assessmentId: l.assessment.id, versionId: nv.id, actorId: user.id, type: "NEW_REVISION", payload: { from: l.versionId, versionNumber: number, categories: i.categories, measureStatusesCarriedForward: carriedStatuses } },
     });
     return { versionId: nv.id, versionNumber: number };
   });
@@ -604,10 +622,15 @@ async function transferOwnership(user: CurrentUser, l: Loaded, i: Extract<Action
   await prisma.$transaction(async (tx) => {
     const res = await tx.assessment.updateMany({ where: { id: l.assessment.id, ownerId: user.id, lifecycle: { not: "ARCHIVED" } }, data: { ownerId: target.id } });
     if (res.count !== 1) throw new HttpError(409, "The assessment was changed by someone else. Reload and try again.");
+    // CD-33: "keep me as a viewer" reuses an existing active share untouched (no duplicate row, no change to its
+    // grantor, date or permissions); a new read-only share is created only when none is active.
+    let reusedExistingShare = false;
     if (i.keepAsViewer) {
-      await tx.assessmentAccess.create({ data: { assessmentId: l.assessment.id, userId: user.id, kind: "SHARED_VIEW", grantedById: user.id } });
+      const active = await tx.assessmentAccess.findFirst({ where: { assessmentId: l.assessment.id, userId: user.id, revokedAt: null } });
+      if (active) reusedExistingShare = true;
+      else await tx.assessmentAccess.create({ data: { assessmentId: l.assessment.id, userId: user.id, kind: "SHARED_VIEW", grantedById: user.id } });
     }
-    await event(tx, l, user.id, "OWNERSHIP_TRANSFERRED", { from: user.id, to: target.id, keptAsViewer: i.keepAsViewer === true });
+    await event(tx, l, user.id, "OWNERSHIP_TRANSFERRED", { from: user.id, to: target.id, keptAsViewer: i.keepAsViewer === true, reusedExistingShare });
   });
   return {};
 }

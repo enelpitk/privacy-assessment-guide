@@ -7,6 +7,7 @@ import { canCreateAssessment, isEligibleDpo, type Role } from "@/domain/permissi
 import type { AnswerState } from "@/domain/conditions";
 import { loadAccessible } from "./access";
 import { loadThreads } from "./governanceData";
+import { isVersionRejected } from "@/lib/labels";
 import type { Path } from "@/domain/workflow";
 import type { ClientField, PageData } from "@/lib/types";
 import { fieldKey } from "@/lib/types";
@@ -153,6 +154,10 @@ export async function listAssessments(user: CurrentUser, f: RegisterFilters) {
     orderBy: { updatedAt: "desc" },
     take: 200,
   });
+  const finalisedVersionIds = rows.filter((a) => a.lifecycle === "FINALISED" && a.currentVersionId).map((a) => a.currentVersionId as string);
+  const decisions = finalisedVersionIds.length
+    ? await prisma.ownerDecision.findMany({ where: { versionId: { in: finalisedVersionIds } }, select: { versionId: true, decision: true, createdAt: true } })
+    : [];
   return rows.map((a) => ({
     id: a.id,
     displayId: a.displayId,
@@ -161,6 +166,7 @@ export async function listAssessments(user: CurrentUser, f: RegisterFilters) {
     groupEntity: a.department.groupEntity,
     ownerName: a.owner.displayName,
     lifecycle: a.lifecycle,
+    rejected: a.lifecycle === "FINALISED" && a.currentVersionId ? isVersionRejected(decisions, a.currentVersionId) : false,
     screeningStatus: a.screeningStatus,
     versionNumber: a.versions[0]?.versionNumber ?? "—",
     updatedAt: a.updatedAt.toISOString(),
@@ -228,6 +234,9 @@ export async function loadPageData(user: CurrentUser, assessmentId: string): Pro
       displayId: assessment.displayId,
       name: assessment.name,
       lifecycle: assessment.lifecycle,
+      rejected:
+        assessment.lifecycle === "FINALISED" &&
+        isVersionRejected(await prisma.ownerDecision.findMany({ where: { versionId }, select: { versionId: true, decision: true, createdAt: true } }), versionId),
       screeningStatus: assessment.screeningStatus,
       versionNumber: version.versionNumber,
       ownerId: owner.id,

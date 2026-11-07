@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } fr
 import { STAGES, stageNumber, subsectionById, subsectionLabel } from "@/content";
 import { openQuestions } from "@/domain/openQuestions";
 import { buildModel, evaluateAssessment, evaluateSubsection, stageProgress } from "@/domain/model";
-import { LIFECYCLE_LABEL, SCREENING_LABEL } from "@/lib/labels";
+import { lifecycleLabel, SCREENING_LABEL } from "@/lib/labels";
 import type { PageData } from "@/lib/types";
 import { StoreCtx, useStoreCtx, useStoreRev } from "./context";
 import { CollabProvider, useCollab } from "./collab";
@@ -159,7 +159,7 @@ function AssessmentHeader() {
           </p>
           <h1 className="truncate text-lg font-semibold sm:text-xl">{a.name}</h1>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm">
-            <span className="chip-neutral">{LIFECYCLE_LABEL[a.lifecycle] ?? a.lifecycle}</span>
+            <span className="chip-neutral">{lifecycleLabel(a.lifecycle, a.rejected)}</span>
             <span className="chip-neutral">{SCREENING_LABEL[a.screeningStatus] ?? a.screeningStatus}</span>
             <span className="chip-neutral">Version {a.versionNumber}</span>
             {page.path === "PRE_ONLY" ? <span className="chip-neutral">Pre-assessment only</span> : null}

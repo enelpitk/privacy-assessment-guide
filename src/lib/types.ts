@@ -38,6 +38,8 @@ export interface ClientAssessment {
   displayId: string;
   name: string;
   lifecycle: string;
+  /** Finalised with a latest owner decision of "Rejected" (shown as "Finalised — Rejected"). */
+  rejected?: boolean;
   screeningStatus: string;
   versionNumber: string;
   ownerId: string;

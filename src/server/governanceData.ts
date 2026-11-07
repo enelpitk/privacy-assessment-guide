@@ -11,6 +11,7 @@ import type {
 import { buildModel, evaluateAssessment } from "@/domain/model";
 import { SCREENING_SUBSECTIONS, rolesOf, submissionBlockers, type Path } from "@/domain/workflow";
 import type { SnapshotPayload } from "@/domain/snapshot";
+import { isVersionRejected } from "@/lib/labels";
 import { load, stateOf } from "./governance";
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
@@ -100,6 +101,8 @@ export async function loadGovernance(user: CurrentUser, assessmentId: string): P
   }
 
   const opSup = new Set(ops.map((o) => o.supersedesId).filter(Boolean));
+  // A screening-cycle opinion whose screening decision was superseded (screening reopened) belongs to an earlier cycle.
+  const supersededScreeningSnapshots = new Set(sds.filter((d) => d.supersededAt).map((d) => d.snapshotId));
   const progressFor = (type: string, id: string) =>
     progress.filter((p) => p.itemType === type && p.itemId === id).map((p) => ({ status: p.status, note: p.note, authorName: n(p.authorId), createdAt: p.createdAt.toISOString() }));
 
@@ -134,6 +137,8 @@ export async function loadGovernance(user: CurrentUser, assessmentId: string): P
         responsibleUserId: ownerVal?.userId ?? null,
         due,
         status: eff,
+        registerStatus: status,
+        latestRecordedStatus: latest?.status ?? null,
         overdue: due !== "" && due < todayIso && eff !== "COMPLETED",
         progress: prog,
       };
@@ -175,7 +180,7 @@ export async function loadGovernance(user: CurrentUser, assessmentId: string): P
     })),
     opinions: ops.map((o) => ({
       id: o.id, kind: o.kind, dpoName: n(o.dpoId), category: o.category, opinionText: o.opinionText, recommendations: o.recommendations,
-      supersedesId: o.supersedesId, superseded: opSup.has(o.id), createdAt: o.createdAt.toISOString(),
+      supersedesId: o.supersedesId, superseded: opSup.has(o.id), earlierScreeningCycle: o.kind === "SCREENING" && supersededScreeningSnapshots.has(o.snapshotId), createdAt: o.createdAt.toISOString(),
     })),
     blocking: blocking.map((b) => ({
       id: b.id, reason: b.reason, subsectionId: b.subsectionId, raisedByName: n(b.raisedById), raisedAt: b.raisedAt.toISOString(), status: b.status,
@@ -192,7 +197,7 @@ export async function loadGovernance(user: CurrentUser, assessmentId: string): P
     })),
     versions: versions.map((v) => ({
       id: v.id, versionNumber: v.versionNumber, kind: v.kind, createdAt: v.createdAt.toISOString(), reason: v.revisionReason, changeDescription: v.changeDescription,
-      categories: v.changeCategories, current: v.id === vid,
+      categories: v.changeCategories, current: v.id === vid, rejected: isVersionRejected(decisions, v.id),
     })),
     events: events.map((e) => ({ id: e.id, type: e.type, actorName: n(e.actorId), createdAt: e.createdAt.toISOString(), summary: describeEvent(e.type, e.payload as Record<string, unknown> | null, n) })),
     unreviewed,

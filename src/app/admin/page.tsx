@@ -2,7 +2,7 @@ import { redirect, unstable_rethrow } from "next/navigation";
 import { DbProblemView } from "@/components/DbProblem";
 import { prisma } from "@/lib/db";
 import { describeDbProblem } from "@/lib/errors";
-import { LIFECYCLE_LABEL } from "@/lib/labels";
+import { isVersionRejected, lifecycleLabel } from "@/lib/labels";
 import { getCurrentUser } from "@/lib/session";
 import { AdminReassign } from "./AdminReassign";
 
@@ -22,9 +22,10 @@ export default async function AdminPage() {
         </main>
       );
     }
-    const [assessments, dpos] = await Promise.all([
+    const [assessments, dpos, decisions] = await Promise.all([
       prisma.assessment.findMany({ include: { owner: true, assignedDpo: true }, orderBy: { updatedAt: "desc" }, take: 200 }),
       prisma.user.findMany({ where: { roles: { has: "DPO" } }, orderBy: { displayName: "asc" } }),
+      prisma.ownerDecision.findMany({ select: { versionId: true, decision: true, createdAt: true } }),
     ]);
     return (
       <main id="main" className="mx-auto max-w-[88rem] px-4 py-6">
@@ -40,7 +41,7 @@ export default async function AdminPage() {
                 {a.name} <span className="text-ink-soft">({a.displayId})</span>
               </p>
               <p className="text-ink-soft">
-                Owner: {a.owner.displayName} · DPO: {a.assignedDpo.displayName} · {LIFECYCLE_LABEL[a.lifecycle] ?? a.lifecycle}
+                Owner: {a.owner.displayName} · DPO: {a.assignedDpo.displayName} · {lifecycleLabel(a.lifecycle, a.lifecycle === "FINALISED" && a.currentVersionId ? isVersionRejected(decisions, a.currentVersionId) : false)}
               </p>
               <AdminReassign
                 assessmentId={a.id}

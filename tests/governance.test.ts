@@ -10,6 +10,7 @@ import { collectionIndex, fieldIndex } from "@/content";
 import { buildModel, evaluateAssessment } from "@/domain/model";
 import { createAssessment } from "@/server/assessments";
 import { runAction } from "@/server/governance";
+import { loadGovernance } from "@/server/governanceData";
 import { saveChanges } from "@/server/save";
 import { HttpError } from "@/lib/errors";
 import type { CurrentUser } from "@/lib/session";
@@ -423,6 +424,76 @@ describe("pre-assessment-only path", () => {
   });
 });
 
+describe("CD-34: an earlier short opinion stays historical after the screening is reopened", () => {
+  async function preOnlyThenReopen() {
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    await act(dpo1, { action: "recordScreeningDecision", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "No indication", opinionCategory: "NO_OBJECTIONS", opinionText: "Short opinion, first screening cycle." });
+    expect(await status(act(owner, { action: "reopenScreening" }))).toBe(200);
+  }
+
+  it("keeps the short opinion and its snapshot unchanged, and the new cycle needs its own decision and opinion", async () => {
+    await preOnlyThenReopen();
+    const first = table("dpoOpinion")[0];
+    expect(table("dpoOpinion")).toHaveLength(1);
+    expect(first).toMatchObject({ kind: "SCREENING", opinionText: "Short opinion, first screening cycle." });
+    expect(A()).toMatchObject({ screeningStatus: "INVALIDATED", screeningPath: "OPEN", lifecycle: "DRAFT" });
+    // the old opinion cannot stand in for a new screening decision, a new full submission or an owner decision
+    expect(await status(act(owner, { action: "ownerDecision", decision: "APPROVED", rationale: "Using the old opinion" }))).toBe(409);
+    expect(await status(act(owner, { action: "submitFull" }))).toBe(409);
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    expect(await status(act(dpo1, { action: "recordScreeningDecision", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "Again" }))).toBe(422); // a new short opinion is required
+    expect(table("screeningDecision").filter((d) => !d.supersededAt)).toHaveLength(0);
+    await act(dpo1, { action: "recordScreeningDecision", decision: "PROCEED_FULL", rationale: "Full assessment needed" });
+    expect(await status(act(owner, { action: "ownerDecision", decision: "APPROVED", rationale: "Using the old opinion" }))).toBe(409); // still no full-review opinion
+    completeAll();
+    await act(owner, { action: "submitFull" });
+    expect(await status(act(owner, { action: "ownerDecision", decision: "APPROVED", rationale: "Not yet reviewed" }))).toBe(409);
+    await act(dpo1, { action: "submitOpinion", category: "RECOMMENDATIONS", opinionText: "Full review opinion." });
+    expect(table("dpoOpinion")).toHaveLength(2);
+    expect(table("dpoOpinion")[0]).toEqual(first); // unchanged
+    expect(table("dpoOpinion")[1].kind).toBe("FULL");
+    expect(table("dpoOpinion")[1].snapshotId).not.toBe(first.snapshotId);
+    expect(A().lifecycle).toBe("AWAITING_OWNER_DECISION");
+  });
+
+  it("the governance data marks the earlier cycle's short opinion as an earlier screening cycle and leaves the rows unchanged", async () => {
+    await preOnlyThenReopen();
+    const before = JSON.stringify(table("dpoOpinion"));
+    let g = await loadGovernance(dpo1, id);
+    expect(g.opinions).toHaveLength(1);
+    expect(g.opinions[0]).toMatchObject({ kind: "SCREENING", earlierScreeningCycle: true, superseded: false });
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    await act(dpo1, { action: "recordScreeningDecision", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "Still sufficient", opinionCategory: "RECOMMENDATIONS", opinionText: "Second cycle opinion." });
+    g = await loadGovernance(dpo1, id);
+    expect(g.opinions.map((o) => o.earlierScreeningCycle)).toEqual([true, false]);
+    expect(JSON.stringify(table("dpoOpinion").slice(0, 1))).toBe(JSON.stringify(JSON.parse(before)));
+  });
+
+  it("the version data marks a rejected finalised version as rejected, and an approved one not", async () => {
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    await act(dpo1, { action: "recordScreeningDecision", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "No indication", opinionCategory: "NO_OBJECTIONS", opinionText: "No objections." });
+    await act(owner, { action: "ownerDecision", decision: "REJECTED", rationale: "Not proceeding" });
+    const g = await loadGovernance(owner, id);
+    expect(g.state.lifecycle).toBe("FINALISED");
+    expect(g.versions.find((v) => v.current)?.rejected).toBe(true);
+  });
+
+  it("a second pre-assessment-only decision records a new short opinion against the new screening snapshot", async () => {
+    await preOnlyThenReopen();
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    expect(await status(act(dpo1, { action: "recordScreeningDecision", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "Still sufficient", opinionCategory: "RECOMMENDATIONS", opinionText: "Second cycle opinion." }))).toBe(200);
+    const ops = table("dpoOpinion");
+    expect(ops).toHaveLength(2);
+    expect(ops[1].snapshotId).not.toBe(ops[0].snapshotId);
+    expect(A().lifecycle).toBe("AWAITING_OWNER_DECISION");
+  });
+});
+
 describe("versions, revisions, archive and deletion", () => {
   async function finalised() {
     await toFullReview();
@@ -462,6 +533,39 @@ describe("versions, revisions, archive and deletion", () => {
     expect(table("dpoOpinion").every((o) => o.versionId === v1)).toBe(true);
     expect(table("reviewMark").filter((m) => m.versionId === a.currentVersionId).length).toBeGreaterThan(30);
     expect(table("event").map((e) => e.type)).toContain("NEW_REVISION");
+  });
+
+  it("CD-31: a new revision carries each measure's latest recorded status as an editable answer and leaves the old version and progress history unchanged", async () => {
+    const v1 = A().currentVersionId;
+    table("recordItem").push({ id: "risk1", versionId: v1, collection: "J.risk", parentId: null, ordering: 0, revision: 1, deletedAt: null, createdById: "o1" });
+    for (const m of ["measA", "measB", "measC", "measD"]) table("recordItem").push({ id: m, versionId: v1, collection: "J.risk.measure", parentId: "risk1", ordering: 0, revision: 1, deletedAt: null, createdById: "o1" });
+    setAnswer("J.risk.status", "IN_PROGRESS", "measA"); // completed after the decision
+    setAnswer("J.risk.status", "COMPLETED", "measB"); // regressed after the decision (latest is not "Completed")
+    setAnswer("J.risk.status", "IN_PROGRESS", "measC"); // no progress record: register status stays
+    // measD has no register status and no progress
+    await finalised();
+    expect(await status(act(owner, { action: "recordProgress", itemType: "MEASURE", itemId: "measA", status: "IN_PROGRESS", note: "Started" }))).toBe(200);
+    expect(await status(act(owner, { action: "recordProgress", itemType: "MEASURE", itemId: "measA", status: "COMPLETED", note: "Done, evidence EV-1" }))).toBe(200);
+    expect(await status(act(owner, { action: "recordProgress", itemType: "MEASURE", itemId: "measB", status: "NOT_STARTED", note: "Control withdrawn" }))).toBe(200);
+    expect(await status(act(owner, { action: "startRevision", reason: "Review", changeDescription: "Measures updated", categories: ["other"] }))).toBe(200);
+    const v2 = A().currentVersionId;
+    const rec = (version: string, collection: string) => table("recordItem").filter((r) => r.versionId === version && r.collection === collection);
+    const newId = (i: number) => rec(v2, "J.risk.measure")[i].id;
+    const statusIn = (version: string, recordId: string) => table("responseField").find((f) => f.versionId === version && f.fieldId === "J.risk.status" && f.recordId === recordId);
+    expect(statusIn(v2, newId(0))).toMatchObject({ value: "COMPLETED", state: "ANSWERED", revision: 1 });
+    expect(statusIn(v2, newId(1))?.value).toBe("NOT_STARTED");
+    expect(statusIn(v2, newId(2))?.value).toBe("IN_PROGRESS");
+    expect(statusIn(v2, newId(3))?.value ?? null).toBeNull(); // no register status and no progress: nothing invented (the test helper may have filled it "Not sure")
+    // old version's register answers are unchanged; progress history stays with the old version only
+    expect(statusIn(v1, "measA")?.value).toBe("IN_PROGRESS");
+    expect(statusIn(v1, "measB")?.value).toBe("COMPLETED");
+    expect(table("progressRecord")).toHaveLength(3);
+    expect(table("progressRecord").every((p) => p.versionId === v1)).toBe(true);
+    // the new draft's section is still marked as carried forward and the carry-forward is logged
+    expect(table("reviewMark").some((m) => m.versionId === v2 && m.subsectionId === "J2" && !m.confirmedAt)).toBe(true);
+    expect(table("event").find((e) => e.type === "NEW_REVISION")?.payload).toMatchObject({ measureStatusesCarriedForward: 2 });
+    // the carried answer is an ordinary editable answer
+    expect(await save(owner, "J.risk.status", "IN_PROGRESS", newId(0))).not.toBe("rejected");
   });
 
   it("a carried-forward section must be confirmed as reviewed before submission, and the screening is revisited", async () => {
@@ -513,6 +617,25 @@ describe("ownership transfer and DPO reassignment", () => {
     expect(ev.payload).toMatchObject({ from: "o1", to: "o2", keptAsViewer: true });
     expect(await status(act(owner, { action: "archive" }))).toBe(403); // no longer the owner
     expect(table("assessmentAccess")[0]).toMatchObject({ userId: "o1", kind: "SHARED_VIEW" });
+  });
+
+  it("CD-33: 'keep me as a viewer' reuses an existing active share instead of creating a duplicate, and the share can still be revoked", async () => {
+    await act(owner, { action: "transferOwnership", newOwnerId: "o2", keepAsViewer: true }); // o1 now holds one share
+    const original = { ...table("assessmentAccess")[0] };
+    await act(owner2, { action: "transferOwnership", newOwnerId: "o1" }); // back to o1 without keeping a share; o1's share remains active
+    expect(table("assessmentAccess").filter((x) => x.userId === "o1" && !x.revokedAt)).toHaveLength(1);
+    await act(owner, { action: "transferOwnership", newOwnerId: "o2", keepAsViewer: true });
+    const active = table("assessmentAccess").filter((x) => x.userId === "o1" && !x.revokedAt);
+    expect(active).toHaveLength(1);
+    expect(table("assessmentAccess")).toHaveLength(1);
+    expect(active[0]).toEqual(original); // the existing row is untouched: same id, kind, grantor, dates
+    expect(active[0].revokedAt ?? null).toBeNull();
+    const evs = table("event").filter((e) => e.type === "OWNERSHIP_TRANSFERRED");
+    expect(evs[evs.length - 1].payload).toMatchObject({ from: "o1", to: "o2", keptAsViewer: true, reusedExistingShare: true });
+    expect(evs[0].payload).toMatchObject({ reusedExistingShare: false });
+    // the owner can still revoke it (previous owner is no longer owner here)
+    expect(await status(act(owner2, { action: "revokeAccess", userId: "o1" }))).toBe(200);
+    expect(table("assessmentAccess").filter((x) => x.userId === "o1" && !x.revokedAt)).toHaveLength(0);
   });
 
   it("without 'keep as viewer' the previous owner loses access", async () => {

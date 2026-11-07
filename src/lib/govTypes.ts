@@ -41,6 +41,8 @@ export interface OpinionView {
   recommendations: string | null;
   supersedesId: string | null;
   superseded: boolean;
+  /** A short screening opinion from an earlier screening cycle (the screening was reopened). Historical only. */
+  earlierScreeningCycle: boolean;
   createdAt: string;
 }
 
@@ -88,7 +90,12 @@ export interface MeasureView {
   responsibleName: string;
   responsibleUserId: string | null;
   due: string;
+  /** Effective status: the latest recorded progress status, else the register status. */
   status: string;
+  /** Status in this version's register (at the decision once the version is decided). Never changed by progress records. */
+  registerStatus: string;
+  /** Status from the latest progress record that carries one, or null when none was recorded. */
+  latestRecordedStatus: string | null;
   overdue: boolean;
   progress: { status: string | null; note: string; authorName: string; createdAt: string }[];
 }
@@ -111,6 +118,8 @@ export interface VersionView {
   changeDescription: string | null;
   categories: string[];
   current: boolean;
+  /** Latest owner decision recorded for this version is "Rejected". */
+  rejected: boolean;
 }
 
 export interface EventView {

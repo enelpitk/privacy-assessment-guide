@@ -8,6 +8,20 @@ export const LIFECYCLE_LABEL: Record<string, string> = {
   ARCHIVED: "Archived",
 };
 
+/** A finalised version whose latest owner decision is "Rejected" must never read as approved. */
+export function lifecycleLabel(lifecycle: string, rejected = false): string {
+  if (lifecycle === "FINALISED" && rejected) return "Finalised — Rejected";
+  return LIFECYCLE_LABEL[lifecycle] ?? lifecycle;
+}
+
+/** True when the latest owner decision recorded for this version is a rejection. */
+export function isVersionRejected(decisions: { versionId: string; decision: string; createdAt: Date | string }[], versionId: string): boolean {
+  const mine = decisions.filter((d) => d.versionId === versionId);
+  if (mine.length === 0) return false;
+  const latest = mine.reduce((a, b) => (new Date(b.createdAt).getTime() >= new Date(a.createdAt).getTime() ? b : a));
+  return latest.decision === "REJECTED";
+}
+
 export const SCREENING_LABEL: Record<string, string> = {
   NOT_SUBMITTED: "Screening not submitted",
   AWAITING_DPO: "Screening awaiting DPO review",

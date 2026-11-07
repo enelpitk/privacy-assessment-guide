@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { SUBSECTIONS, STAGES, stageNumber, subsectionById, subsectionLabel } from "@/content";
 import { rolesOf, CHANGE_CATEGORIES } from "@/domain/workflow";
 import type { GovernanceData } from "@/lib/govTypes";
-import { LIFECYCLE_LABEL, SCREENING_LABEL } from "@/lib/labels";
+import { lifecycleLabel, SCREENING_LABEL } from "@/lib/labels";
 import { NON_ASSIGNABLE } from "@/server/assignable";
 import { useStoreCtx } from "./context";
 import { formatTime } from "./Fields";
@@ -154,7 +154,7 @@ function StatusCard({ gov }: { gov: GovernanceData }) {
   return (
     <Card title="Where this assessment stands">
       <p className="flex flex-wrap gap-2">
-        <span className="chip-neutral">{LIFECYCLE_LABEL[s.lifecycle] ?? s.lifecycle}</span>
+        <span className="chip-neutral">{lifecycleLabel(s.lifecycle, gov.versions.find((v) => v.current)?.rejected === true)}</span>
         <span className="chip-neutral">{SCREENING_LABEL[s.screeningStatus] ?? s.screeningStatus}</span>
         <span className="chip-neutral">Path: {PATH_LABEL[s.path]}</span>
         <span className="chip-neutral">Version {page.assessment.versionNumber}</span>
@@ -442,12 +442,14 @@ function OpinionHistory({ gov }: { gov: GovernanceData }) {
       <h3 className="font-semibold">Formal DPO opinions (read-only history)</h3>
       <ul className="mt-1 space-y-2">
         {gov.opinions.map((o) => (
-          <li key={o.id} className={`rounded border p-2 ${o.superseded ? "border-slate-200 bg-slate-50 text-ink-soft" : "border-slate-300 bg-white"}`}>
+          <li key={o.id} className={`rounded border p-2 ${o.superseded || o.earlierScreeningCycle ? "border-slate-200 bg-slate-50 text-ink-soft" : "border-slate-300 bg-white"}`}>
             <p>
               <strong>{OPINION_LABEL[o.category]}</strong> — {o.dpoName}, {formatTime(o.createdAt)} ({o.kind === "SCREENING" ? "screening opinion" : "full review"})
               {o.supersedesId ? <span className="chip-neutral ml-2">Amendment</span> : null}
               {o.superseded ? <span className="chip-neutral ml-2">Superseded</span> : null}
+              {o.earlierScreeningCycle ? <span className="chip-warn ml-2">Earlier screening cycle</span> : null}
             </p>
+            {o.earlierScreeningCycle ? <p className="text-ink-soft">Historical only: the screening was reopened after this opinion. It does not count for the current screening cycle.</p> : null}
             <p className="whitespace-pre-wrap">{o.opinionText}</p>
             {o.recommendations ? <p className="whitespace-pre-wrap"><strong>Recommendations:</strong> {o.recommendations}</p> : null}
           </li>
@@ -529,6 +531,11 @@ function DecisionCard({ gov }: { gov: GovernanceData }) {
               <input type="checkbox" className="h-4 w-4" checked={departs || mustDepart} onChange={(e) => setDeparts(e.target.checked)} disabled={mustDepart} />
               I depart from the DPO’s opinion and accept the documented risk{mustDepart ? " (required for this decision)" : ""}
             </label>
+            {op === "RECOMMENDATIONS" && decision === "CONDITIONALLY_APPROVED" ? (
+              <p className="text-ink-soft" data-testid="dpo-recommendation-reminder">
+                If any DPO recommendation remains unaddressed, tick ‘I depart from the DPO’s opinion’ and explain why.
+              </p>
+            ) : null}
             {departs || mustDepart ? <TextArea label="Why you depart from the DPO’s opinion, and the risk you accept" value={departWhy} onChange={(v) => { setDeparts(true); setDepartWhy(v); }} /> : null}
             {decision === "CONDITIONALLY_APPROVED" ? (
               <div className="space-y-2">
@@ -590,6 +597,8 @@ function DecisionCard({ gov }: { gov: GovernanceData }) {
     </Card>
   );
 }
+
+const MEASURE_STATUS_LABEL: Record<string, string> = { NOT_STARTED: "Not started", IN_PROGRESS: "In progress", COMPLETED: "Completed" };
 
 function ConditionsCard({ gov }: { gov: GovernanceData }) {
   const { page } = useStoreCtx();
@@ -655,7 +664,12 @@ function ConditionsCard({ gov }: { gov: GovernanceData }) {
                   {m.overdue ? <span className="chip-bad ml-2">Overdue since {m.due}</span> : null}
                 </p>
                 <p className="text-ink-soft">
-                  Responsible: {m.responsibleName} · Due: {m.due || "none"} · Status: {m.status || "not set"}
+                  Responsible: {m.responsibleName} · Due: {m.due || "none"}
+                </p>
+                <p className="text-ink-soft">
+                  <strong>{["AWAITING_CONDITIONS", "FINALISED"].includes(gov.state.lifecycle) ? "Status at decision" : "Status in the register"}:</strong>{" "}
+                  {MEASURE_STATUS_LABEL[m.registerStatus] ?? "not set"} · <strong>Latest recorded status:</strong>{" "}
+                  {m.latestRecordedStatus ? (MEASURE_STATUS_LABEL[m.latestRecordedStatus] ?? m.latestRecordedStatus) : "no progress recorded"}
                 </p>
                 {m.progress.length ? (
                   <ul className="mt-1 list-disc pl-5">
@@ -910,7 +924,7 @@ export function HistoryPanel({ gov }: { gov: GovernanceData }) {
             <li key={v.id} className="rounded border border-slate-300 bg-white p-2">
               <p>
                 <strong>Version {v.versionNumber}</strong> {v.current ? <span className="chip-good ml-1">Current</span> : null}{" "}
-                <span className="chip-neutral ml-1">{v.kind === "FINALISED" ? "Finalised" : "Draft"}</span> · started {formatTime(v.createdAt)}
+                <span className={v.rejected ? "chip-bad ml-1" : "chip-neutral ml-1"}>{v.kind === "FINALISED" ? (v.rejected ? "Finalised — Rejected" : "Finalised") : "Draft"}</span> · started {formatTime(v.createdAt)}
               </p>
               {v.reason ? <p>Reason: {v.reason}</p> : <p className="text-ink-soft">Initial draft</p>}
               {v.changeDescription ? <p>Changes: {v.changeDescription}</p> : null}
@@ -1042,7 +1056,8 @@ export function GovStatus({ kind }: { kind: "screening" | "opinion" | "decision"
   if (failed) return <p className="text-sm">Could not load the review status. {link}</p>;
   if (!gov) return <p className="help-text">Loading review status…</p>;
   const sd = [...gov.screeningDecisions].reverse().find((d) => !d.superseded);
-  const op = [...gov.opinions].reverse().find((o) => !o.superseded);
+  const op = [...gov.opinions].reverse().find((o) => !o.superseded && !o.earlierScreeningCycle);
+  const earlier = [...gov.opinions].reverse().find((o) => !o.superseded && o.earlierScreeningCycle);
   const od = [...gov.ownerDecisions].reverse()[0];
   return (
     <div className="max-w-prose2 space-y-1 rounded-md border border-slate-200 bg-white p-3 text-sm">
@@ -1061,8 +1076,14 @@ export function GovStatus({ kind }: { kind: "screening" | "opinion" | "decision"
             <strong>{OPINION_LABEL[op.category]}</strong> — {op.dpoName}, {formatTime(op.createdAt)}. {op.opinionText.slice(0, 240)}
           </p>
         ) : (
-          <p>No formal DPO opinion is recorded yet.</p>
+          <p>No formal DPO opinion is recorded yet{earlier ? " for the current screening cycle" : ""}.</p>
         )
+      ) : null}
+      {kind === "opinion" && earlier ? (
+        <p className="text-ink-soft" data-testid="earlier-cycle-opinion">
+          <span className="chip-warn mr-2">Earlier screening cycle</span>
+          {OPINION_LABEL[earlier.category]} — {earlier.dpoName}, {formatTime(earlier.createdAt)}. Historical only; it does not count for the current screening cycle.
+        </p>
       ) : null}
       {kind === "decision" ? (
         od ? (

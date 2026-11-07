@@ -17,7 +17,7 @@ export default async function SnapshotPage({ params }: { params: Promise<{ id: s
   try {
     const user = await getCurrentUser();
     if (!user) redirect("/enter");
-    await loadAccessible(user, id); // same visibility rule as the assessment
+    const { assessment } = await loadAccessible(user, id); // same visibility rule as the assessment
     const snap = await prisma.snapshot.findFirst({ where: { id: snapshotId, assessmentId: id } });
     if (!snap) notFound();
     const payload = snap.payload as unknown as SnapshotPayload;
@@ -43,6 +43,11 @@ export default async function SnapshotPage({ params }: { params: Promise<{ id: s
           Read-only. Saved {snap.takenAt.toISOString().slice(0, 16).replace("T", " ")} UTC by {people.get(snap.takenById) ?? "unknown"}. Fingerprint {snap.contentHash.slice(0, 12)}. This content can never be
           changed; later edits happen in the current version.
         </p>
+        <p className="help-text mt-1" data-testid="snapshot-owners">
+          Owner recorded when this snapshot was taken: <strong>{people.get(payload.ownerId) ?? "unknown"}</strong>. Current owner of the assessment:{" "}
+          <strong>{people.get(assessment.ownerId) ?? "unknown"}</strong>
+          {payload.ownerId !== assessment.ownerId ? " (ownership has been transferred since)." : "."}
+        </p>
         {opinions.length || decisions.length || ownerDecisions.length ? (
           <section className="card mt-4 text-sm">
             <h2 className="font-semibold">Recorded against this snapshot</h2>
@@ -54,7 +59,7 @@ export default async function SnapshotPage({ params }: { params: Promise<{ id: s
                 <li key={o.id}>DPO opinion ({o.category}) by {people.get(o.dpoId)}: {o.opinionText}</li>
               ))}
               {ownerDecisions.map((o) => (
-                <li key={o.id}>Owner decision ({o.decision}) by {people.get(o.ownerId)}: {o.rationale}</li>
+                <li key={o.id}>Owner decision ({o.decision}) by {people.get(o.ownerId)} (owner at the time of the decision): {o.rationale}</li>
               ))}
             </ul>
           </section>
