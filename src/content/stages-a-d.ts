@@ -61,10 +61,11 @@ export const STAGE_A: StageDef = {
         }),
         field(
           "A.owner",
-          "Owner (process, system or service owner responsible for this activity)",
+          "Owner",
           "computed",
           {
             computed: "owner",
+            sourceText: "Owner (process, system or service owner responsible for this activity)",
             workflow: "system",
             workflowNote:
               "The owner is the person who created the assessment. Ownership transfer is a recorded action (arrives in Stage 4).",
@@ -102,7 +103,7 @@ export const STAGE_A: StageDef = {
           ],
           {
             added: true,
-            help: { inline: "Select all that apply." },
+            help: { essential: true, inline: "Select all that apply." },
           },
         ),
         longtext("A.changeDescription", "If “Changed processing” — describe what has changed", {
@@ -189,7 +190,7 @@ export const STAGE_B: StageDef = {
       items: [
         flag("B.proc.none", "No processors are involved", {
           completeWhen: { hasRecords: "B.proc" },
-          help: { inline: "Tick this if no processor is involved; otherwise add each processor below." },
+          help: { essential: true, inline: "Tick this if no processor is involved; otherwise add each processor below." },
         }),
         collection(
           "B.proc",

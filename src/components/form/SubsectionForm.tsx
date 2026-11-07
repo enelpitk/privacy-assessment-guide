@@ -44,7 +44,6 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
   const { store, page, navigate } = useStoreCtx();
   const model = useModel();
   const sub = subsectionById.get(subsectionId);
-  const [saveMsg, setSaveMsg] = useState<string | null>(null);
 
   const order = SUBSECTIONS.filter((s) => isSubsectionActive(s, model.ctx));
   const idx = order.findIndex((s) => s.id === subsectionId);
@@ -58,11 +57,13 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
   );
   if (!sub) return <p>Unknown section.</p>;
   const stage = STAGES.find((s) => s.id === sub.stage)!;
+  const pendingNote = sub.items.find((i) => (i.kind === "field" || i.kind === "collection") && i.workflow && i.workflow !== "system");
+  const pendingText = pendingNote && (pendingNote.kind === "field" || pendingNote.kind === "collection") ? pendingNote.workflowNote : undefined;
   const active = isSubsectionActive(sub, model.ctx);
   const canStructure = canChangeRecords(page.actor, page.ctx, sub.id);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto]">
       <div>
         <p className="text-sm text-ink-soft">
           Stage {stage.id}: {stage.title}
@@ -70,8 +71,11 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
         <h2 className="mt-1 text-2xl font-semibold">
           {sub.id} · {sub.title}
         </h2>
-        <p className="help-text mt-1">{sub.summary}</p>
-        {sub.intro ? <p className="mt-3 max-w-prose2 text-base">{sub.intro}</p> : null}
+        {pendingText ? (
+          <p className="mt-3 max-w-prose2 border-l-2 border-slate-300 pl-3 text-sm text-ink-soft" role="status">
+            <strong>Pending:</strong> {pendingText}
+          </p>
+        ) : null}
 
         {!active ? (
           <div className="mt-4 rounded-md border border-slate-300 bg-white p-3">
@@ -110,14 +114,7 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
               Previous: {prev.title}
             </a>
           ) : null}
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={async () => {
-              const ok = await store.flush();
-              setSaveMsg(ok ? "Saved." : "Some changes could not be saved. See the notes next to the affected answers.");
-            }}
-          >
+          <button type="button" className="btn-secondary" onClick={() => void store.flush()}>
             Save draft
           </button>
           {next ? (
@@ -132,44 +129,35 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
               Next: {next.title}
             </a>
           ) : null}
-          <span role="status" className="text-sm text-ink-soft">
-            {saveMsg}
-          </span>
         </nav>
       </div>
 
-      <aside aria-label="Help for this section">
-        <div className="hidden lg:sticky lg:top-4 lg:block">
-          <HelpPanel title={sub.title} summary={sub.summary} help={sub.help} />
-        </div>
-        <details className="rounded-md border border-slate-200 bg-white p-3 lg:hidden">
-          <summary className="cursor-pointer font-medium text-brand-700">Help for this section</summary>
-          <div className="mt-2">
-            <HelpPanel title={sub.title} summary={sub.summary} help={sub.help} />
-          </div>
+      <aside aria-label="About this section" className="order-first lg:order-none">
+        <details className="rounded-md border border-slate-200 bg-white p-3 text-sm lg:sticky lg:top-4 lg:max-w-xs">
+          <summary className="w-fit cursor-pointer font-medium text-brand-700">About this section</summary>
+          <HelpPanel summary={sub.summary} intro={sub.intro} help={sub.help} />
         </details>
       </aside>
     </div>
   );
 }
 
-function HelpPanel({ title, summary, help }: { title: string; summary: string; help?: Help }) {
+function HelpPanel({ summary, intro, help }: { summary: string; intro?: string; help?: Help }) {
   return (
-    <div className="card text-sm">
-      <h3 className="font-semibold">About “{title}”</h3>
-      <p className="help-text mt-1">{summary}</p>
-      {help?.explain ? <p className="mt-2">{help.explain}</p> : null}
+    <div className="mt-2 space-y-2 text-ink-soft">
+      <p>{summary}</p>
+      {intro ? <p>{intro}</p> : null}
+      {help?.explain ? <p>{help.explain}</p> : null}
       {help?.include ? (
-        <p className="mt-2">
-          <strong>What your answer should include:</strong> {help.include}
+        <p>
+          <strong className="text-ink">What your answer should include:</strong> {help.include}
         </p>
       ) : null}
       {help?.example ? (
-        <p className="mt-2 text-ink-soft">
-          <strong>Example (guidance, not your answer):</strong> {help.example}
+        <p>
+          <strong className="text-ink">Example (guidance, not your answer):</strong> {help.example}
         </p>
       ) : null}
-      {!help ? <p className="help-text mt-2">Use “Explain this” beside a question for guidance.</p> : null}
     </div>
   );
 }

@@ -107,7 +107,7 @@ export const STAGE_E: StageDef = {
               sourceText: "Data subjects — Identify whose personal data is processed (e.g. customers, employees, job applicants or other individuals).",
               covers: ["E.purpose.subjects.example"],
               help: {
-                inline: "Whose personal data is processed? Pick from the suggestions or add your own.",
+                essential: true, inline: "Whose personal data is processed? Pick from the suggestions or add your own.",
               },
             }),
             entities("E.purpose.categories", "Personal data category", "DATA_CATEGORY", {
@@ -115,7 +115,7 @@ export const STAGE_E: StageDef = {
                 "Personal data category — List the specific personal data collected or used (e.g. name, email address, phone number or date of birth). Avoid broad terms such as “contact details”.",
               covers: ["E.purpose.categories.example"],
               help: {
-                inline: "List specific data items, not broad terms such as “customer data” or “contact details”.",
+                essential: true, inline: "List specific data items, not broad terms such as “customer data” or “contact details”.",
                 example: "Illustration only: name, email address, phone number, date of birth.",
               },
             }),
@@ -198,7 +198,7 @@ export const STAGE_E: StageDef = {
             ),
             multi("E.sc.cond", "Conditions for processing special category data — Article 9(2) GDPR", ART9_CONDITIONS, {
               activeWhen: { f: "E.sc.categories", includesOtherThan: "criminal", scope: "record" },
-              help: { inline: "Select every condition that applies. Criminal offence data is handled separately below." },
+              help: { essential: true, inline: "Select every condition that applies. Criminal offence data is handled separately below." },
             }),
             longtext("E.sc.justification", "Justification", {
               help: { inline: "Explain why the condition applies." },
@@ -236,7 +236,7 @@ export const STAGE_E: StageDef = {
       items: [
         yesno("E.sec.applies", "Will personal data be used for any purpose other than the one for which it was originally collected?", {
           added: true,
-          help: { inline: "If No, this subsection is not applicable." },
+          help: { essential: true, inline: "If No, this subsection is not applicable." },
         }),
         longtext(
           "E.sec.question",
@@ -346,7 +346,7 @@ export const STAGE_E: StageDef = {
       items: [
         flag("E.share.none", "No data is shared", {
           completeWhen: { hasRecords: "E.share" },
-          help: { inline: "Tick this if no data is shared; otherwise add each recipient below." },
+          help: { essential: true, inline: "Tick this if no data is shared; otherwise add each recipient below." },
         }),
         collection(
           "E.share",
@@ -401,27 +401,27 @@ export const STAGE_F: StageDef = {
       items: [
         longtext("F.type", "AI type", {
           sourceText: "What type of AI or AI-based system is used? For example, a predictive model, a large language model (LLM), a generative AI tool or a scoring model.",
-          help: { inline: "What type of AI or AI-based system is used?" },
+          help: { essential: true, inline: "What type of AI or AI-based system is used?" },
         }),
         longtext("F.purpose", "Purpose", {
           sourceText: "What does the AI system do, and why is it used instead of, or alongside, a non-AI approach?",
-          help: { inline: "What does the AI system do, and why is it used instead of, or alongside, a non-AI approach?" },
+          help: { essential: true, inline: "What does the AI system do, and why is it used instead of, or alongside, a non-AI approach?" },
         }),
         longtext("F.role", "Role in the process", {
           sourceText:
             "Explain how the AI system is used in the process. Does it provide recommendations to a human, or does it make decisions without human intervention?",
           help: {
-            inline: "Does it provide recommendations to a human, or make decisions without human intervention?",
+            essential: true, inline: "Does it provide recommendations to a human, or make decisions without human intervention?",
             example: "Illustration only: a scoring model suggests a decision; a human officer makes the final call.",
           },
         }),
         longtext("F.io", "Data inputs", {
           sourceText: "What personal data does the AI system use as input, and what information or results does it produce as output?",
-          help: { inline: "What personal data does the AI system use as input?", example: "Illustration only: input: transaction history, income data." },
+          help: { essential: true, inline: "What personal data does the AI system use as input?", example: "Illustration only: input: transaction history, income data." },
         }),
         longtext("F.io.outputs", "Data outputs", {
           added: true,
-          help: { inline: "What information or results does it produce as output?", example: "Illustration only: output: a risk score." },
+          help: { essential: true, inline: "What information or results does it produce as output?", example: "Illustration only: output: a risk score." },
         }),
       ],
     },
@@ -509,7 +509,7 @@ export const STAGE_G: StageDef = {
           "G.internal.status",
           "Does the processing comply with the relevant internal policies and requirements?",
           [opt("YES", "Yes"), opt("PARTIAL", "Partially"), opt("NO", "No")],
-          { help: { inline: "If Yes, refer to the policy. If Partially or No, explain what is missing and what actions are planned." } },
+          { help: { essential: true, inline: "If Yes, refer to the policy. If Partially or No, explain what is missing and what actions are planned." } },
         ),
         link("G.internal.policyRef", "Policy reference", {
           optional: false,

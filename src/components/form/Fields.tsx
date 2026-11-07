@@ -57,7 +57,7 @@ function AutoTextarea(props: {
 }
 
 const STATE_LABEL: Record<string, string> = {
-  ANSWERED: "Answer normally",
+  ANSWERED: "Answered",
   NOT_SURE: "Not sure — I need help",
   COMPLETE_LATER: "Complete later",
   NOT_APPLICABLE: "Not applicable",
@@ -126,15 +126,30 @@ export function FieldBlock({
   const disabled = !perm.ok;
   const inputId = `${uid}-in`;
   const helpId = `${uid}-help`;
+  const essentialId = def.help?.essential && def.help.inline ? helpId : undefined;
   const hints = (def.hints ?? []).filter((h) => evaluate(h.when, evalCtx, recordId));
 
+  if (def.workflow === "system") {
+    // Read-only metadata, shown compactly.
+    const v = def.computed === "owner" ? page.assessment.ownerName : def.computed === "displayId" ? page.assessment.displayId : "";
+    return (
+      <div className="text-sm">
+        <span className="text-ink-soft">{def.label}: </span>
+        <strong>{v}</strong>
+        {def.sourceText ? (
+          <details className="mt-0.5 text-xs text-ink-soft">
+            <summary className="w-fit cursor-pointer text-brand-700">Original template wording</summary>
+            <p className="mt-1">{def.sourceText}</p>
+          </details>
+        ) : null}
+      </div>
+    );
+  }
   if (def.workflow) {
     return (
-      <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
-        <p className="label">{def.label}</p>
-        <p className="help-text mt-1">
-          <strong>Pending:</strong> {def.workflowNote ?? "Recorded through the review workflow."}
-        </p>
+      <div className="border-l-2 border-slate-300 pl-3">
+        <p className="font-medium">{def.label}</p>
+        <p className="text-sm text-ink-soft">Pending — recorded in a later stage.</p>
       </div>
     );
   }
@@ -147,19 +162,22 @@ export function FieldBlock({
   const isGroup = def.type === "yesno" || def.type === "choice" || def.type === "multi";
 
   const labelEl = isGroup ? (
-    <legend className="label">{def.label}</legend>
+    <legend className="label">
+      {def.label}
+      {def.optional ? <span className="ml-2 text-xs font-normal text-ink-soft">(optional)</span> : null}
+    </legend>
   ) : (
     <label htmlFor={inputId} className="label">
       {def.label}
+      {def.optional ? <span className="ml-2 text-xs font-normal text-ink-soft">(optional)</span> : null}
     </label>
   );
 
   const body = (
     <>
-      {def.optional ? <span className="chip-neutral mr-2">Optional</span> : null}
-      {def.help?.inline ? (
+      {essentialId ? (
         <p id={helpId} className="help-text mt-1">
-          {def.help.inline}
+          {def.help?.inline}
         </p>
       ) : null}
       <HelpDetails def={def} />
@@ -171,7 +189,7 @@ export function FieldBlock({
             type="text"
             value={asString}
             disabled={disabled}
-            aria-describedby={def.help?.inline ? helpId : undefined}
+            aria-describedby={essentialId}
             aria-invalid={f?.error ? true : undefined}
             onChange={(e) => set(e.target.value)}
           />
@@ -203,7 +221,7 @@ export function FieldBlock({
             id={inputId}
             value={asString}
             disabled={disabled}
-            describedBy={def.help?.inline ? helpId : undefined}
+            describedBy={essentialId}
             onChange={set}
           />
         )}
@@ -353,20 +371,25 @@ export function FieldBlock({
 
 function HelpDetails({ def }: { def: FieldDef }) {
   const h = def.help;
-  if (!h && !def.sourceText) return null;
-  const Row = ({ title, children }: { title: string; children: ReactNode }) => (
-    <details className="mt-1 max-w-prose2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm">
-      <summary className="cursor-pointer font-medium text-brand-700">{title}</summary>
-      <div className="mt-1 text-ink-soft">{children}</div>
-    </details>
+  const inline = h && !h.essential ? h.inline : undefined;
+  if (!inline && !h?.explain && !h?.include && !h?.example && !def.sourceText) return null;
+  const Part = ({ title, children }: { title: string; children: ReactNode }) => (
+    <div>
+      <p className="font-medium text-ink">{title}</p>
+      <p>{children}</p>
+    </div>
   );
   return (
-    <div className="mt-1">
-      {h?.explain ? <Row title="Explain this">{h.explain}</Row> : null}
-      {h?.include ? <Row title="What should my answer include?">{h.include}</Row> : null}
-      {h?.example ? <Row title="Example (guidance, not your answer)">{h.example}</Row> : null}
-      {def.sourceText ? <Row title="Original template wording">{def.sourceText}</Row> : null}
-    </div>
+    <details className="mt-1 max-w-prose2 text-sm">
+      <summary className="w-fit cursor-pointer text-brand-700">Guidance</summary>
+      <div className="mt-1 space-y-2 border-l-2 border-slate-200 pl-3 text-ink-soft">
+        {inline ? <p>{inline}</p> : null}
+        {h?.explain ? <Part title="Explain this">{h.explain}</Part> : null}
+        {h?.include ? <Part title="What should my answer include?">{h.include}</Part> : null}
+        {h?.example ? <Part title="Example (guidance, not your answer)">{h.example}</Part> : null}
+        {def.sourceText ? <Part title="Original template wording">{def.sourceText}</Part> : null}
+      </div>
+    </details>
   );
 }
 
@@ -385,42 +408,49 @@ function StatePanel({
 }) {
   const { store } = useStoreCtx();
   const uid = useId();
-  const selectValue = state === "UNANSWERED" ? "ANSWERED" : state;
+  const current = state === "UNANSWERED" ? "ANSWERED" : state;
   const options: AnswerState[] = ["ANSWERED", "NOT_SURE", "COMPLETE_LATER"];
   if (def.allowNA) options.push("NOT_APPLICABLE");
-  const needsNote = state === "NOT_APPLICABLE" || state === "NOT_SURE" || state === "COMPLETE_LATER";
+  const unresolved = state === "NOT_SURE" || state === "COMPLETE_LATER";
+  const needsNote = unresolved || state === "NOT_APPLICABLE";
   const noteLabel =
     state === "NOT_APPLICABLE"
       ? "Why is this not applicable? (required)"
       : "What do you need help with, or what question do you have for the reviewer? (optional)";
   return (
-    <div className="mt-3 max-w-prose2">
-      <div className="flex flex-wrap items-center gap-2">
-        <label htmlFor={`${uid}-st`} className="text-sm text-ink-soft">
-          Answer status
-        </label>
-        <select
-          id={`${uid}-st`}
-          className="rounded-md border border-slate-400 bg-white px-2 py-1 text-sm"
-          value={selectValue}
-          disabled={disabled}
-          onChange={(e) => {
-            const v = e.target.value as AnswerState;
-            if (v === "ANSWERED") {
-              store.edit(def.id, recordId, { state: isEmptyValue(def, f?.value) ? "UNANSWERED" : "ANSWERED" });
-            } else {
-              store.edit(def.id, recordId, { state: v });
-            }
-          }}
-        >
-          {options.map((o) => (
-            <option key={o} value={o}>
-              {STATE_LABEL[o]}
-            </option>
-          ))}
-        </select>
-        {state === "NOT_SURE" || state === "COMPLETE_LATER" ? (
-          <span className="chip-warn">Unresolved — this is not the same as “No”</span>
+    <div className="mt-2 max-w-prose2">
+      <div className="flex flex-wrap items-center gap-3">
+        {current !== "ANSWERED" ? (
+          <span className={unresolved ? "chip-warn" : "chip-neutral"}>
+            {STATE_LABEL[current]}
+            {unresolved ? " — unresolved, not “No”" : ""}
+          </span>
+        ) : null}
+        {!disabled ? (
+          <details className="text-sm">
+            <summary className="w-fit cursor-pointer text-brand-700">Answer options</summary>
+            <fieldset className="mt-1 space-y-1 rounded-md border border-slate-200 bg-white p-2">
+              <legend className="sr-only">Answer options for {def.label}</legend>
+              {options.map((o) => (
+                <label key={o} className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name={`${uid}-st`}
+                    className="h-4 w-4"
+                    checked={current === o}
+                    onChange={() => {
+                      if (o === "ANSWERED") {
+                        store.edit(def.id, recordId, { state: isEmptyValue(def, f?.value) ? "UNANSWERED" : "ANSWERED" });
+                      } else {
+                        store.edit(def.id, recordId, { state: o });
+                      }
+                    }}
+                  />
+                  {STATE_LABEL[o]}
+                </label>
+              ))}
+            </fieldset>
+          </details>
         ) : null}
       </div>
       {needsNote ? (
@@ -444,25 +474,29 @@ function StatePanel({
 function FieldMeta({ f }: { f: FieldState | undefined }) {
   const { store } = useStoreCtx();
   if (!f) return null;
-  let chip = <span className="chip-neutral">Saved</span>;
-  if (f.status === "dirty") chip = <span className="chip-warn">Unsaved changes</span>;
-  if (f.status === "saving") chip = <span className="chip-neutral">Saving…</span>;
-  if (f.status === "failed") chip = <span className="chip-bad">Not saved</span>;
-  if (f.status === "conflict") chip = <span className="chip-bad">Conflict — choose below</span>;
-  if (f.status === "rejected") chip = <span className="chip-bad">Not saved — needs attention</span>;
-  if (f.status === "clean" && f.baseRevision === 0) chip = <span className="chip-neutral">Nothing saved yet</span>;
+  const routine =
+    f.status === "dirty" ? "Unsaved changes" : f.status === "saving" ? "Saving…" : f.baseRevision > 0 ? "Saved" : "Nothing saved yet";
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-soft" aria-live="polite">
-      {chip}
-      {f.status === "failed" ? (
-        <button type="button" className="btn-link" onClick={() => void store.flush()}>
-          Retry
-        </button>
+    <div className="mt-1 text-xs text-ink-soft" aria-live="polite">
+      {f.status === "failed" || f.status === "rejected" || f.status === "conflict" ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="chip-bad">
+            {f.status === "failed" ? "Not saved" : f.status === "rejected" ? "Not saved — needs attention" : "Conflict — choose below"}
+          </span>
+          {f.status === "failed" ? (
+            <button type="button" className="btn-link" onClick={() => void store.flush()}>
+              Retry
+            </button>
+          ) : null}
+        </div>
       ) : null}
       {f.editorName && f.lastEditedAt ? (
-        <span>
-          Last edited by {f.editorName}, {formatTime(f.lastEditedAt)}
-        </span>
+        <details className="mt-1">
+          <summary className="w-fit cursor-pointer">Edit details</summary>
+          <p className="mt-1">
+            Last edited by {f.editorName}, {formatTime(f.lastEditedAt)}. Status: {routine}.
+          </p>
+        </details>
       ) : null}
     </div>
   );

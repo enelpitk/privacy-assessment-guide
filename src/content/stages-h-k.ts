@@ -70,6 +70,7 @@ function rowFields(prefix: "H.p" | "H.r", r: Row & { conditional?: string }): It
   }
   const measures: FieldDef = field(id, r.statement, "longtext", {
     help: {
+      essential: true,
       inline: r.keyQuestion,
       example: `Illustration only: ${r.example}`,
     },
@@ -97,15 +98,15 @@ export const STAGE_H: StageDef = {
       items: [
         longtext("H.min.necessary", "Why is this data necessary?", {
           sourceText: "For each category of personal data, explain why it is needed for the stated purpose. Could the purpose be achieved using less data?",
-          help: { inline: "For each category of personal data, explain why it is needed. Could the purpose be achieved using less data?" },
+          help: { essential: true, inline: "For each category of personal data, explain why it is needed. Could the purpose be achieved using less data?" },
         }),
         longtext("H.min.retention", "Retention period", {
           sourceText: "State how long the data will be kept. Refer to the relevant law or internal policy, where applicable. If no retention period has been defined, explain why and provide an estimate.",
-          help: { inline: "State how long the data will be kept and the law or policy you rely on. If none is defined, explain why and give an estimate." },
+          help: { essential: true, inline: "State how long the data will be kept and the law or policy you rely on. If none is defined, explain why and give an estimate." },
         }),
         longtext("H.min.deletion", "Deletion or disposal method", {
           sourceText: "Explain how and when the data will be deleted, anonymised or otherwise securely disposed of. Can individual records be deleted if required? Describe any limitations.",
-          help: { inline: "How and when is data deleted or anonymised? Can single records be deleted? Any limitations?" },
+          help: { essential: true, inline: "How and when is data deleted or anonymised? Can single records be deleted? Any limitations?" },
         }),
       ],
     },
@@ -408,7 +409,7 @@ export const STAGE_K: StageDef = {
         longtext("K.views", "Views of data subjects or their representatives", {
           sourceText:
             "Where appropriate, describe how the views of affected individuals or their representatives were obtained and summarise their feedback. If their views were not sought, explain why, where relevant.",
-          help: { inline: "Describe how views were obtained and summarise feedback, or explain why they were not sought." },
+          help: { essential: true, inline: "Describe how views were obtained and summarise feedback, or explain why they were not sought." },
         }),
       ],
     },

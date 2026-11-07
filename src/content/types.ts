@@ -30,6 +30,8 @@ export interface Option {
 }
 
 export interface Help {
+  /** Keep the inline text visible: it is a qualification or the question itself, needed to answer correctly. */
+  essential?: boolean;
   /** One or two plain-English sentences shown under the question. */
   inline?: string;
   /** "Explain this" text. */

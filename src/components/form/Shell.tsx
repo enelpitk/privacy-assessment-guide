@@ -71,6 +71,9 @@ export function Shell({ page, current, children }: { page: PageData; current: st
     <StoreCtx.Provider value={{ store, page, navigate }}>
       <AssessmentHeader />
       <NavToggle open={panel.open} toggle={panel.toggle} />
+      <div className="fixed bottom-3 right-3 z-40 rounded-full border border-slate-300 bg-white px-3 py-1.5 shadow-md">
+        <SaveIndicator />
+      </div>
       <div className={`mx-auto grid max-w-[88rem] gap-6 px-4 py-5 ${panel.columns}`}>
         <SideNav current={current} visibility={panel.visibility} />
         <main id="main" className="min-w-0">
@@ -162,7 +165,6 @@ function AssessmentHeader() {
             <span className="text-ink-soft">DPO: {a.dpoName}</span>
           </p>
         </div>
-        <SaveIndicator />
       </div>
     </div>
   );
