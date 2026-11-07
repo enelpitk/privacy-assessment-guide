@@ -132,11 +132,6 @@ export const STAGE_B: StageDef = {
       noAbout: true,
       covers: ["B.ctrl.guidance"],
       items: [
-        field("B1.help", "Not sure – I need help", "flag", {
-          added: true,
-          optional: true,
-          helpRequest: true,
-        }),
         // Retired from the screen, still stored: joint controllers are added as further controller records.
         flag("B.ctrl.noJoint", "There are no joint controllers", {
           hidden: true,
@@ -163,9 +158,14 @@ export const STAGE_B: StageDef = {
             titleField: "B.ctrl.name",
             addLabel: "+ Add a new Controller",
             guidance:
-              "A controller is an entity of the group that decides why and how personal data is processed. If two or more entities jointly decide, they are joint controllers: add a record for each and describe their respective responsibilities.",
+              "A controller is an entity of the group that decides why and how personal data is processed. If two or more entities jointly decide, they are joint controllers: add a controller record for each of them and describe their respective roles and responsibilities. If there are no joint controllers, add only the one controller.",
           },
         ),
+        field("B1.help", "Not sure – I need help", "flag", {
+          added: true,
+          optional: true,
+          helpRequest: true,
+        }),
       ],
     },
     {

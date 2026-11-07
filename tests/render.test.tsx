@@ -222,7 +222,34 @@ describe("2.1 Controllers", () => {
     expect(html).not.toContain("Answer options");
     expect(html).not.toContain("Complete later");
     expect(html).not.toContain("About this section");
-    expect((html.match(/>Guidance</g) ?? []).length).toBe(1); // one Guidance per record
+  });
+  it("shows the controller guidance once, collapsed, near the Controller heading", () => {
+    const two = page();
+    two.records.push({ id: "c2", collection: "B.ctrl", parentId: null, ordering: 1, revision: 1 });
+    const html = render("B1", two).replace(/<!-- -->/g, "");
+    expect((html.match(/>Guidance</g) ?? []).length).toBe(1); // once, not per record
+    const m = /<details([^>]*)><summary[^>]*>Guidance<\/summary><p[^>]*>([^<]*)<\/p>/.exec(html);
+    expect(m).not.toBeNull();
+    expect(m![1]).not.toContain("open"); // collapsed by default
+    expect(m![2]).toContain("decides why and how personal data is processed");
+    expect(m![2]).toContain("jointly decide");
+    expect(m![2]).toContain("respective roles and responsibilities");
+    expect(html.indexOf("Guidance")).toBeLessThan(html.indexOf("Controller 1"));
+  });
+  it("puts the single help request after all controller records and the add control", () => {
+    const html = render("B1", page()).replace(/<!-- -->/g, "");
+    const help = html.indexOf("Not sure – I need help");
+    expect(help).toBeGreaterThan(html.indexOf("+ Add a new Controller"));
+    expect(help).toBeGreaterThan(html.indexOf("Roles and responsibilities"));
+    expect(help).toBeLessThan(html.indexOf("Save draft"));
+    expect(html.match(/Not sure – I need help/g)).toHaveLength(1);
+  });
+  it("keeps an existing help request, its status and comment", () => {
+    const p = page();
+    p.fields["B1.help|"] = { value: true, state: "ANSWERED", rationale: "Which entity is joint?", revision: 3, editorName: "A", lastEditedAt: "2026-11-07T10:00:00.000Z" };
+    const html = render("B1", p);
+    expect(html).toContain("Help requested — unresolved");
+    expect(html).toContain("Which entity is joint?");
   });
 });
 

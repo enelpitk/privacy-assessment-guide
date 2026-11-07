@@ -312,6 +312,15 @@ function CollectionEditor({
     return (
       <section aria-label={col.label} className={nested ? "mt-3 border-l-2 border-slate-200 pl-3" : ""}>
         {nested ? <h4 className="text-sm font-semibold">{col.label}</h4> : null}
+        {col.guidance ? (
+          <>
+            <h3 className="text-base font-semibold">{col.itemLabel}</h3>
+            <details className="mt-1 text-sm">
+              <summary className="w-fit cursor-pointer text-brand-700">Guidance</summary>
+              <p className="mt-1 max-w-prose2 text-ink-soft">{col.guidance}</p>
+            </details>
+          </>
+        ) : null}
         {col.min && recs.length < col.min ? <p className="help-text">Add at least one to complete this part.</p> : null}
         <ol className="mt-2 space-y-3">
           {recs.map((r, i) => {
@@ -346,12 +355,6 @@ function CollectionEditor({
             ) : null;
             const body = (
               <>
-                {col.guidance ? (
-                  <details className="text-sm">
-                    <summary className="w-fit cursor-pointer text-brand-700">Guidance</summary>
-                    <p className="mt-1 text-ink-soft">{col.guidance}</p>
-                  </details>
-                ) : null}
                 <div className="mt-2 space-y-3">
                   <Items items={col.items} recordId={r.id} subsectionId={subsectionId} evalCtx={evalCtx} />
                 </div>
