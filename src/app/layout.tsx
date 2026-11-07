@@ -59,7 +59,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         </header>
         {children}
         <footer className="mx-auto max-w-[88rem] px-4 py-6 text-xs text-ink-soft">
-          Educational demonstration. The demo identity is not authentication, and no result here is legal advice or a certification of lawfulness.
+          <p>Educational demonstration. The demo identity is not authentication, and no result here is legal advice or a certification of lawfulness.</p>
+          <p className="mt-1">© 2026 Harbour Financial Group. Built with Claude Code</p>
         </footer>
       </body>
     </html>
