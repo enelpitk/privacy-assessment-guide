@@ -413,3 +413,21 @@ Subsection IDs are stable and are the unit of assignment and navigation.
 ## Out of inventory by design
 
 The source's decorative layout, empty padding rows, and column widths are not substantive. Word-layout reproduction is phase two.
+
+## UI adaptations (focused simplification; source mappings unchanged)
+
+These change how items are presented, not which source items exist. Every ID above still has a definition (checked by the automated coverage test).
+
+| Item | Adaptation |
+|---|---|
+| Visible numbering | Sections are shown as 1–11 and subsections as 1.1, 1.2, 2.1 … in order within each section. Internal IDs (A–K, C0 …), routes, stored answers and assignment references are unchanged. |
+| `A.generatedId` | Kept and exported; not shown in the questionnaire view or the assessment header. Shown in the register. |
+| `A.owner` | Shown in the assessment header only; exported from the owner relationship. |
+| `B.ctrl.guidance` | Shown as the single "Guidance" inside each controller record. |
+| `B.ctrl.noJoint`, `B.ctrl.kind` | Retired from the screen (hidden fields). Existing values are preserved and exported, never erased or reclassified. Joint controllers are added as further controller records, described in "Roles and responsibilities". |
+| `B.ctrl.name` | Single-select "Select" offering Harbour Insurance, Harbour Asset Management and Harbour Bank. Previously saved custom names remain selectable and editable. |
+| `B.proc.name`, `B.sub.name` | Entry with reuse of existing entries; no suggestion list. |
+| `B.proc.none` | Checkbox kept; its instruction sentence removed (the meaning is carried by the label). |
+| Answer-status controls | Not offered in 1.1, 1.2, 2.1 and 2.2. In 2.1 and 2.2 a single "Not sure – I need help" request (with comment) replaces them. An active request keeps the subsection unresolved until cleared. Existing stored states are preserved and shown, with an explicit "Mark as answered" action. |
+| `A.previousRef` | Kept; the sentence "Existing assessments are entered manually in this version" removed from the screen. |
+| `A.reason` | The prompt "Select all that apply" removed; multi-select behaviour unchanged. |

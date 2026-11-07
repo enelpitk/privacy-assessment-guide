@@ -33,9 +33,10 @@ export const STAGE_A: StageDef = {
       id: "A1",
       stage: "A",
       title: "Processing",
-      summary: "Name, owner and a short description of the processing.",
+      summary: "Name and a short description of the processing.",
       intro:
         "A DPIA helps assess whether the processing of personal data is necessary and proportionate, and identifies potential risks to individuals’ rights and freedoms.",
+      answerControls: "none",
       covers: [
         "TPL.intro.purpose",
         "TPL.intro.scope",
@@ -48,14 +49,14 @@ export const STAGE_A: StageDef = {
       ],
       help: {
         explain:
-          "The assessment focuses exclusively on personal data. Information about legal entities and anonymised data falls outside its scope. Data about natural persons linked to a legal entity (for example board members, beneficial owners or contact persons) is personal data and is in scope. The pre-assessment (stage C) is completed first to indicate whether a full DPIA is needed. Start early, review throughout the project and finalise before personal data processing begins. For an existing activity, first check whether a DPIA already exists; if so, update it. These are template rules of this organisation, not a statement of the law.",
+          "The assessment focuses exclusively on personal data. Information about legal entities and anonymised data falls outside its scope. Data about natural persons linked to a legal entity (for example board members, beneficial owners or contact persons) is personal data and is in scope. The pre-assessment (section 3) is completed first to indicate whether a full DPIA is needed. Start early, review throughout the project and finalise before personal data processing begins. For an existing activity, first check whether a DPIA already exists; if so, update it. These are template rules of this organisation, not a statement of the law.",
       },
       items: [
+        // The generated identifier is kept and exported, but not shown in the questionnaire view.
         field("A.generatedId", "Assessment identifier", "computed", {
           computed: "displayId",
           workflow: "system",
-          workflowNote: "Generated automatically.",
-          added: false,
+          hidden: true,
         }),
         text("A.processingName", "Name of the processing", {
           help: {
@@ -82,6 +83,7 @@ export const STAGE_A: StageDef = {
       stage: "A",
       title: "Reason for the assessment",
       summary: "Why a DPIA is being done and what has changed, if anything.",
+      answerControls: "none",
       items: [
         multi(
           "A.reason",
@@ -92,10 +94,7 @@ export const STAGE_A: StageDef = {
             opt("mandated", "Mandated by law", "A.reason.mandated"),
             opt("other", "Other (e.g. regular review)", "A.reason.other"),
           ],
-          {
-            added: true,
-            help: { essential: true, inline: "Select all that apply." },
-          },
+          { added: true },
         ),
         longtext("A.changeDescription", "If “Changed processing” — describe what has changed", {
           activeWhen: { f: "A.reason", includes: "changed" },
@@ -111,7 +110,7 @@ export const STAGE_A: StageDef = {
         link("A.previousRef", "Previous assessment reference", {
           help: {
             inline:
-              "If this activity was assessed before (for example in a Word document), enter its reference or link. Existing assessments are entered manually in this version.",
+              "If this activity was assessed before (for example in a Word document), enter its reference or link.",
           },
         }),
       ],
@@ -129,40 +128,43 @@ export const STAGE_B: StageDef = {
       stage: "B",
       title: "Controllers",
       summary: "Who decides why and how personal data is processed.",
+      answerControls: "help",
+      noAbout: true,
       covers: ["B.ctrl.guidance"],
-      help: {
-        explain:
-          "A controller is an entity of the group that decides why and how personal data is processed. If two or more entities jointly decide, they are joint controllers: add a row for each and describe their respective responsibilities.",
-      },
       items: [
+        field("B1.help", "Not sure – I need help", "flag", {
+          added: true,
+          optional: true,
+          helpRequest: true,
+        }),
+        // Retired from the screen, still stored: joint controllers are added as further controller records.
         flag("B.ctrl.noJoint", "There are no joint controllers", {
-          completeWhen: { f: "B.ctrl.kind", eq: "JOINT", scope: "any" },
-          help: {
-            inline:
-              "Tick this if only one entity decides. Otherwise add each joint controller below.",
-          },
-          covers: [],
+          hidden: true,
+          optional: true,
         }),
         collection(
           "B.ctrl",
-          "Controller(s) or joint controllers",
+          "Controllers",
           "Controller",
           [
+            // Existing controller-type data is preserved but no longer shown or edited.
             choice(
               "B.ctrl.kind",
               "Type",
               [opt("CONTROLLER", "Controller"), opt("JOINT", "Joint controller")],
-              { added: true },
+              { added: true, hidden: true, optional: true },
             ),
-            entity("B.ctrl.name", "Controller name", "PARTY", {
-              help: {
-                inline:
-                  "Pick an existing entry or add a new one. Fictional group entities are offered as suggestions only; nothing is pre-selected for you.",
-              },
-            }),
+            entity("B.ctrl.name", "Select", "PARTY", { ui: "select", noSuggestions: true }),
             longtext("B.ctrl.role", "Roles and responsibilities"),
           ],
-          { min: 1, titleField: "B.ctrl.name", addLabel: "Add a controller or joint controller" },
+          {
+            min: 1,
+            compact: true,
+            titleField: "B.ctrl.name",
+            addLabel: "+ Add a new Controller",
+            guidance:
+              "A controller is an entity of the group that decides why and how personal data is processed. If two or more entities jointly decide, they are joint controllers: add a record for each and describe their respective responsibilities.",
+          },
         ),
       ],
     },
@@ -171,6 +173,7 @@ export const STAGE_B: StageDef = {
       stage: "B",
       title: "Processors and sub-processors",
       summary: "Who processes personal data on the controller’s behalf.",
+      answerControls: "help",
       covers: ["B.proc.guidance", "B.proc.example", "B.rows.addAsNeeded"],
       help: {
         explain:
@@ -179,35 +182,41 @@ export const STAGE_B: StageDef = {
           "Illustration only: a group insurer (controller) uses a group bank (processor) to run payroll services. The bank in turn uses an external hosting provider, which makes the provider a sub-processor.",
       },
       items: [
+        field("B2.help", "Not sure – I need help", "flag", {
+          added: true,
+          optional: true,
+          helpRequest: true,
+        }),
         flag("B.proc.none", "No processors are involved", {
           completeWhen: { hasRecords: "B.proc" },
-          help: { essential: true, inline: "Tick this if no processor is involved; otherwise add each processor below." },
         }),
         collection(
           "B.proc",
-          "Processor(s)",
+          "Processors",
           "Processor",
           [
-            entity("B.proc.name", "Processor name", "PARTY"),
+            entity("B.proc.name", "Processor name", "PARTY", { noSuggestions: true }),
             longtext("B.proc.role", "Roles and responsibilities"),
             link("B.proc.dpaRef", "Data processing agreement (DPA) reference", {
               help: { inline: "Optional text or link to where the agreement is kept." },
             }),
             collection(
               "B.sub",
-              "Sub-processor(s) of this processor",
+              "Sub-processors",
               "Sub-processor",
               [
-                entity("B.sub.name", "Sub-processor name", "PARTY"),
+                entity("B.sub.name", "Sub-processor name", "PARTY", { noSuggestions: true }),
                 longtext("B.sub.role", "Roles and responsibilities"),
                 link("B.sub.dpaRef", "Data processing agreement (DPA) reference"),
               ],
-              { titleField: "B.sub.name", addLabel: "Add a sub-processor" },
+              { compact: true, titleField: "B.sub.name", addLabel: "+ Add sub-processor" },
             ),
           ],
           {
+            compact: true,
+            collapsible: true,
             titleField: "B.proc.name",
-            addLabel: "Add a processor",
+            addLabel: "+ Add processor",
             activeWhen: { not: { f: "B.proc.none", eq: true } },
           },
         ),
@@ -230,7 +239,7 @@ export const STAGE_C: StageDef = {
       title: "Screening inputs",
       summary: "Simple facts about how many people are involved.",
       intro:
-        "Start here: enter simple counts. Later stages of this application will use them to suggest answers to the screening questions, which you always confirm yourself.",
+        "Start here: enter simple counts. Later versions of this application will use them to suggest answers to the screening questions, which you always confirm yourself.",
       items: [
         longtext(
           "C.inputs.scope",
@@ -573,7 +582,7 @@ export const STAGE_D: StageDef = {
       title: "Scope of this DPIA",
       summary: "What is included and what is covered elsewhere.",
       intro:
-        "Until the screening logic arrives in Stage 3, all full-assessment stages are open for completion. Full-assessment stages will become active or inactive according to the screening decision.",
+        "Until the screening logic arrives in Stage 3, all full-assessment sections are open for completion. Full-assessment sections will become active or inactive according to the screening decision.",
       items: [
         longtext("D.scope.included", "What is included in this assessment?"),
         link(

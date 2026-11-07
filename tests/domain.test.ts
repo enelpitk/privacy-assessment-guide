@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fieldIndex, subsectionById } from "@/content";
+import { fieldIndex, stageNumber, subsectionById, subsectionLabel } from "@/content";
 import {
   buildModel,
   evaluateAssessment,
@@ -145,12 +145,49 @@ describe("answer states and completeness", () => {
     expect(one.gaps.some((g) => g.fieldId === "B.ctrl")).toBe(false);
   });
 
-  it("'No joint controllers' is complete when ticked or a joint controller exists", () => {
-    const tick = buildModel([r("B.ctrl.noJoint", true)], []);
-    expect(fieldStatus(def("B.ctrl.noJoint"), tick.ctx.get("B.ctrl.noJoint", ""), tick.ctx, "")).toBe("COMPLETE");
+  it("retired joint-controller controls are hidden: never counted, but their stored values are kept", () => {
     const recs: RecordRow[] = [{ id: "c1", collection: "B.ctrl", ordering: 0 }];
-    const joint = buildModel([r("B.ctrl.kind", "JOINT", "ANSWERED", "c1")], recs);
-    expect(fieldStatus(def("B.ctrl.noJoint"), undefined, joint.ctx, "")).toBe("COMPLETE");
+    const rows = [r("B.ctrl.kind", "JOINT", "ANSWERED", "c1"), r("B.ctrl.noJoint", true), r("B.ctrl.name", "e1", "ANSWERED", "c1"), r("B.ctrl.role", "Runs the service", "ANSWERED", "c1")];
+    const model = buildModel(rows, recs);
+    expect(def("B.ctrl.kind").hidden).toBe(true);
+    expect(def("B.ctrl.noJoint").hidden).toBe(true);
+    expect(model.ctx.get("B.ctrl.kind", "c1")?.value).toBe("JOINT"); // not erased or reclassified
+    const res = evaluateSubsection(subsectionById.get("B1")!, model);
+    expect(res.gaps).toEqual([]); // no impossible requirement
+    expect(res.required).toBe(3); // at least one controller + its name + roles; nothing for the retired controls
+  });
+
+  it("an active help request keeps the subsection unresolved until cleared", () => {
+    const recs: RecordRow[] = [{ id: "c1", collection: "B.ctrl", ordering: 0 }];
+    const base = [r("B.ctrl.name", "e1", "ANSWERED", "c1"), r("B.ctrl.role", "Roles", "ANSWERED", "c1")];
+    const sub = subsectionById.get("B1")!;
+    const clean = evaluateSubsection(sub, buildModel(base, recs));
+    expect(clean.gaps).toEqual([]);
+    const asked = evaluateSubsection(sub, buildModel([...base, r("B1.help", true)], recs));
+    expect(asked.unresolved).toBe(1);
+    expect(asked.gaps.map((g) => g.fieldId)).toEqual(["B1.help"]);
+    expect(asked.complete).toBe(clean.complete); // never counted as complete
+    const cleared = evaluateSubsection(sub, buildModel([...base, r("B1.help", false)], recs));
+    expect(cleared.gaps).toEqual([]);
+  });
+
+  it("existing unresolved states on retired controls stay unresolved", () => {
+    const recs: RecordRow[] = [{ id: "c1", collection: "B.ctrl", ordering: 0 }];
+    const rows = [r("B.ctrl.name", "e1", "ANSWERED", "c1"), r("B.ctrl.role", "Draft roles", "NOT_SURE", "c1")];
+    const res = evaluateSubsection(subsectionById.get("B1")!, buildModel(rows, recs));
+    expect(res.unresolved).toBe(1);
+  });
+
+  it("numbers sections 1-11 and subsections 1.1, 1.2, 2.1 ... without changing internal ids", () => {
+    expect(stageNumber("A")).toBe(1);
+    expect(stageNumber("K")).toBe(11);
+    expect(subsectionLabel("A1")).toBe("1.1");
+    expect(subsectionLabel("A2")).toBe("1.2");
+    expect(subsectionLabel("B1")).toBe("2.1");
+    expect(subsectionLabel("C0")).toBe("3.1");
+    expect(subsectionLabel("C9")).toBe("3.10");
+    expect(subsectionLabel("K7")).toBe("11.7");
+    expect(subsectionById.has("C0")).toBe(true);
   });
 
   it("workflow-owned and computed fields are never counted for the owner", () => {

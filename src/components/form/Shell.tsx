@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
-import { STAGES, subsectionById } from "@/content";
+import { STAGES, stageNumber, subsectionById, subsectionLabel } from "@/content";
 import { buildModel, evaluateAssessment, evaluateSubsection, stageProgress } from "@/domain/model";
 import { LIFECYCLE_LABEL, SCREENING_LABEL } from "@/lib/labels";
 import type { PageData } from "@/lib/types";
@@ -31,7 +31,7 @@ export function Shell({ page, current, children }: { page: PageData; current: st
             try {
               sessionStorage.setItem(
                 FLASH_KEY,
-                `${sub.id} ${sub.title}: ${res.gaps.length} item${res.gaps.length === 1 ? " is" : "s are"} still open${res.unresolved ? ` (${res.unresolved} marked not sure or complete later)` : ""}. You can come back any time.`,
+                `${subsectionLabel(sub.id)} ${sub.title}: ${res.gaps.length} item${res.gaps.length === 1 ? " is" : "s are"} still open${res.unresolved ? ` (${res.unresolved} marked not sure or complete later)` : ""}. You can come back any time.`,
               );
             } catch {
               /* sessionStorage unavailable: skip the notice */
@@ -71,7 +71,7 @@ export function Shell({ page, current, children }: { page: PageData; current: st
     <StoreCtx.Provider value={{ store, page, navigate }}>
       <AssessmentHeader />
       <NavToggle open={panel.open} toggle={panel.toggle} />
-      <div className={`mx-auto grid max-w-[88rem] gap-6 px-4 py-5 ${panel.columns}`}>
+      <div className={`mx-auto grid max-w-[88rem] gap-6 px-4 py-4 ${panel.columns}`}>
         <SideNav current={current} visibility={panel.visibility} />
         <main id="main" className="min-w-0">
           <Flash />
@@ -151,9 +151,9 @@ function AssessmentHeader() {
             <Link className="btn-link" href="/assessments">
               All assessments
             </Link>{" "}
-            · {a.displayId} · {a.department} ({a.groupEntity})
+            · {a.department} ({a.groupEntity})
           </p>
-          <h1 className="truncate text-xl font-semibold sm:text-2xl">{a.name}</h1>
+          <h1 className="truncate text-lg font-semibold sm:text-xl">{a.name}</h1>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm">
             <span className="chip-neutral">{LIFECYCLE_LABEL[a.lifecycle] ?? a.lifecycle}</span>
             <span className="chip-neutral">{SCREENING_LABEL[a.screeningStatus] ?? a.screeningStatus}</span>
@@ -193,7 +193,7 @@ function SideNav({ current, visibility }: { current: string | null; visibility: 
           return (
             <li key={st.id}>
               <p className="font-semibold">
-                {st.id}. {st.title}{" "}
+                {stageNumber(st.id)}. {st.title}{" "}
                 <span className="font-normal text-ink-soft">
                   ({p.complete}/{p.required})
                 </span>
@@ -215,7 +215,7 @@ function SideNav({ current, visibility }: { current: string | null; visibility: 
                         }}
                       >
                         <span>
-                          {s.id} {s.title}
+                          {subsectionLabel(s.id)} {s.title}
                         </span>
                         <span className="shrink-0 text-xs text-ink-soft">
                           {!r.active
@@ -314,9 +314,9 @@ export function Overview() {
   const resume = page.lastSubsection && subsectionById.has(page.lastSubsection) ? page.lastSubsection : null;
   const go = (id: string) => `/assessments/${page.assessment.id}/s/${id}`;
   return (
-    <div className="max-w-prose2 space-y-6">
+    <div className="max-w-prose2 space-y-4">
       <section className="card">
-        <h2 className="text-xl font-semibold">Where you are</h2>
+        <h2 className="text-lg font-semibold">Where you are</h2>
         <p className="mt-2">
           <strong>{result.percent}%</strong> of the applicable answers are completed ({result.complete} of {result.required}). This measures how much has been filled in, not
           whether the processing complies with the GDPR.
@@ -330,7 +330,7 @@ export function Overview() {
               void navigate(go("C0"));
             }}
           >
-            Start with the pre-assessment (C)
+            Start with the pre-assessment (section 3)
           </a>
           {resume ? (
             <a
@@ -341,7 +341,7 @@ export function Overview() {
                 void navigate(go(resume));
               }}
             >
-              Resume last location: {resume} {subsectionById.get(resume)?.title}
+              Resume last location: {subsectionLabel(resume)} {subsectionById.get(resume)?.title}
             </a>
           ) : null}
         </div>
@@ -351,7 +351,7 @@ export function Overview() {
       </section>
 
       <section className="card">
-        <h2 className="text-xl font-semibold">Progress by stage</h2>
+        <h2 className="text-lg font-semibold">Progress by stage</h2>
         <ul className="mt-2 divide-y divide-slate-200">
           {STAGES.map((st) => {
             const p = progress.find((x) => x.id === st.id)!;
@@ -367,7 +367,7 @@ export function Overview() {
                       void navigate(go(first));
                     }}
                   >
-                    {st.id}. {st.title}
+                    {stageNumber(st.id)}. {st.title}
                   </a>
                   <span className="help-text block">{st.description}</span>
                 </span>
@@ -381,7 +381,7 @@ export function Overview() {
       </section>
 
       <section className="card">
-        <h2 className="text-xl font-semibold">Not available yet</h2>
+        <h2 className="text-lg font-semibold">Not available yet</h2>
         <p className="help-text mt-1">These parts of the guide are built in later stages. Nothing on this page implies they work today.</p>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
           <li>Suggested screening answers and automatic screening outcomes, and the risk matrix with your own risks (Stage 3).</li>

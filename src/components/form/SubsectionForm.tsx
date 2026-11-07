@@ -5,7 +5,9 @@ import {
   STAGES,
   SUBSECTIONS,
   fieldIndex,
+  stageNumber,
   subsectionById,
+  subsectionLabel,
   type CollectionDef,
   type Help,
   type InfoDef,
@@ -63,13 +65,13 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
   const canStructure = canChangeRecords(page.actor, page.ctx, sub.id);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_auto]">
+    <div className={`grid gap-5 ${sub.noAbout ? "" : "lg:grid-cols-[minmax(0,1fr)_auto]"}`}>
       <div>
         <p className="text-sm text-ink-soft">
-          Stage {stage.id}: {stage.title}
+          {stageNumber(stage.id)}. {stage.title}
         </p>
-        <h2 className="mt-1 text-2xl font-semibold">
-          {sub.id} · {sub.title}
+        <h2 className="mt-0.5 text-lg font-semibold">
+          {subsectionLabel(sub.id)} {sub.title}
         </h2>
         {pendingText ? (
           <p className="mt-3 max-w-prose2 border-l-2 border-slate-300 pl-3 text-sm text-ink-soft" role="status">
@@ -97,11 +99,11 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
           </p>
         ) : null}
 
-        <form className="mt-5 space-y-6" onSubmit={(e) => e.preventDefault()} noValidate>
+        <form className="mt-4 space-y-4" onSubmit={(e) => e.preventDefault()} noValidate>
           <Items items={sub.items} recordId="" subsectionId={sub.id} evalCtx={model.ctx} />
         </form>
 
-        <nav className="mt-8 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4" aria-label="Section navigation">
+        <nav className="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4" aria-label="Section navigation">
           {prev ? (
             <a
               className="btn-secondary"
@@ -132,12 +134,14 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
         </nav>
       </div>
 
+      {sub.noAbout ? null : (
       <aside aria-label="About this section" className="order-first lg:order-none">
         <details className="rounded-md border border-slate-200 bg-white p-3 text-sm lg:sticky lg:top-4 lg:max-w-xs">
           <summary className="w-fit cursor-pointer font-medium text-brand-700">About this section</summary>
           <HelpPanel summary={sub.summary} intro={sub.intro} help={sub.help} />
         </details>
       </aside>
+      )}
     </div>
   );
 }
@@ -227,6 +231,7 @@ function Items({
       {items.map((it) => {
         if (!isItemActive(it, evalCtx, recordId)) return null;
         if (it.kind === "field") {
+          if (it.hidden) return null;
           return (
             <div key={`${it.id}|${recordId}`} className="max-w-prose2">
               <FieldBlock def={it} recordId={recordId} subsectionId={subsectionId} evalCtx={evalCtx} />
@@ -302,6 +307,94 @@ function CollectionEditor({
       window.location.reload();
     } else setMsg(err);
   };
+
+  if (col.compact) {
+    return (
+      <section aria-label={col.label} className={nested ? "mt-3 border-l-2 border-slate-200 pl-3" : ""}>
+        {nested ? <h4 className="text-sm font-semibold">{col.label}</h4> : null}
+        {col.min && recs.length < col.min ? <p className="help-text">Add at least one to complete this part.</p> : null}
+        <ol className="mt-2 space-y-3">
+          {recs.map((r, i) => {
+            const t = titleOf(r.id);
+            const title = `${col.itemLabel} ${i + 1}${t ? ` — ${t}` : ""}`;
+            const remove = perm.ok ? (
+              confirmId === r.id ? (
+                <span className="flex flex-wrap items-center gap-3 text-sm">
+                  <button
+                    type="button"
+                    className="btn-link text-red-800"
+                    disabled={busy}
+                    onClick={() =>
+                      void run(async () => {
+                        const e = await store.removeRecord(r.id);
+                        setConfirmId(null);
+                        return e;
+                      })
+                    }
+                  >
+                    Confirm remove
+                  </button>
+                  <button type="button" className="btn-link" onClick={() => setConfirmId(null)}>
+                    Cancel
+                  </button>
+                </span>
+              ) : (
+                <button type="button" className="btn-link text-red-800" onClick={() => setConfirmId(r.id)}>
+                  Remove {col.itemLabel.toLowerCase()}
+                </button>
+              )
+            ) : null;
+            const body = (
+              <>
+                {col.guidance ? (
+                  <details className="text-sm">
+                    <summary className="w-fit cursor-pointer text-brand-700">Guidance</summary>
+                    <p className="mt-1 text-ink-soft">{col.guidance}</p>
+                  </details>
+                ) : null}
+                <div className="mt-2 space-y-3">
+                  <Items items={col.items} recordId={r.id} subsectionId={subsectionId} evalCtx={evalCtx} />
+                </div>
+                {remove ? <div className="mt-2">{remove}</div> : null}
+              </>
+            );
+            return col.collapsible ? (
+              <li key={r.id}>
+                <details open className="group rounded-md border border-slate-200 bg-white p-3">
+                  <summary className="cursor-pointer font-medium">
+                    <span aria-hidden="true" className="mr-1.5 group-open:hidden">+</span>
+                    <span aria-hidden="true" className="mr-1.5 hidden group-open:inline">−</span>
+                    {title}
+                  </summary>
+                  <div className="mt-2">{body}</div>
+                </details>
+              </li>
+            ) : (
+              <li key={r.id} className="rounded-md border border-slate-200 bg-white p-3">
+                <h4 className="font-medium">{title}</h4>
+                <div className="mt-1">{body}</div>
+              </li>
+            );
+          })}
+        </ol>
+        {perm.ok ? (
+          <button
+            type="button"
+            className="btn-link mt-2"
+            disabled={busy}
+            onClick={() => void run(() => store.addRecord(col.id, parentRecordId === "" ? null : parentRecordId))}
+          >
+            {col.addLabel ?? `+ Add ${col.itemLabel.toLowerCase()}`}
+          </button>
+        ) : null}
+        {msg ? (
+          <p role="alert" className="mt-2 text-sm font-medium text-red-800">
+            {msg}
+          </p>
+        ) : null}
+      </section>
+    );
+  }
 
   return (
     <section aria-label={col.label} className={nested ? "mt-4 rounded-md border border-slate-200 bg-slate-50 p-3" : ""}>

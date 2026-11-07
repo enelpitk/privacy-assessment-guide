@@ -15,7 +15,7 @@ export default async function NewAssessmentPage() {
       return (
         <main id="main" className="mx-auto max-w-2xl px-4 py-8">
           <div className="card">
-            <h1 className="text-xl font-semibold">Only process owners can create assessments</h1>
+            <h1 className="text-lg font-semibold">Only process owners can create assessments</h1>
             <p className="mt-2">Switch to a process owner identity to create one.</p>
           </div>
         </main>
@@ -27,7 +27,7 @@ export default async function NewAssessmentPage() {
     ]);
     return (
       <main id="main" className="mx-auto max-w-2xl px-4 py-8">
-        <h1 className="text-2xl font-semibold">New assessment</h1>
+        <h1 className="text-xl font-semibold">New assessment</h1>
         <p className="help-text mt-1">
           Every new assessment starts with the pre-assessment. Give it a name now; you can change the name later. Use fictional information only.
         </p>

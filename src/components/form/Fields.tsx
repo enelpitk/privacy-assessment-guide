@@ -1,12 +1,13 @@
 "use client";
 
 import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { changeClassOf, type FieldDef } from "@/content";
+import { changeClassOf, subsectionById, subsectionLabel, type FieldDef } from "@/content";
 import type { AnswerState, EvalCtx } from "@/domain/conditions";
 import { evaluate } from "@/domain/conditions";
 import { canEditField } from "@/domain/permissions";
 import { describeRisk, riskCategory, riskScore } from "@/domain/risk";
 import {
+  CONTROLLER_CHOICES,
   SUGGESTED_DATA_CATEGORIES,
   SUGGESTED_DATA_SUBJECTS,
   SUGGESTED_PARTIES,
@@ -124,11 +125,22 @@ export function FieldBlock({
     subsectionId,
   );
   const disabled = !perm.ok;
+  const mode = subsectionById.get(subsectionId)?.answerControls ?? "field";
   const inputId = `${uid}-in`;
   const helpId = `${uid}-help`;
   const essentialId = def.help?.essential && def.help.inline ? helpId : undefined;
   const hints = (def.hints ?? []).filter((h) => evaluate(h.when, evalCtx, recordId));
 
+  if (def.hidden) return null;
+  if (def.helpRequest) {
+    return (
+      <div>
+        <HelpRequest def={def} recordId={recordId} disabled={disabled} />
+        {f?.status === "conflict" ? <ConflictPanel def={def} f={f} recordId={recordId} /> : null}
+        <FieldMeta f={f} />
+      </div>
+    );
+  }
   if (def.workflow === "system") {
     // Read-only metadata, shown compactly.
     const v = def.computed === "owner" ? page.assessment.ownerName : def.computed === "displayId" ? page.assessment.displayId : "";
@@ -309,7 +321,8 @@ export function FieldBlock({
             <span>{def.label}</span>
           </label>
         )}
-        {(def.type === "entity" || def.type === "entities") && (
+        {def.type === "entity" && def.ui === "select" && <EntitySelect id={inputId} def={def} recordId={recordId} disabled={disabled} />}
+        {(def.type === "entities" || (def.type === "entity" && def.ui !== "select")) && (
           <EntityPicker def={def} recordId={recordId} disabled={disabled} multiple={def.type === "entities"} />
         )}
         {def.type === "person" && <PersonControl id={inputId} value={value} disabled={disabled} onChange={set} />}
@@ -340,7 +353,11 @@ export function FieldBlock({
         </p>
       ))}
 
-      <StatePanel def={def} f={f} state={state} disabled={disabled} recordId={recordId} />
+      {mode === "field" ? (
+        <StatePanel def={def} f={f} state={state} disabled={disabled} recordId={recordId} />
+      ) : (
+        <StateNotice def={def} f={f} state={state} disabled={disabled} recordId={recordId} />
+      )}
       {f?.error ? (
         <p role="alert" className="mt-2 text-sm font-medium text-red-800">
           {f.error}
@@ -743,9 +760,11 @@ function EntityPicker({
       : [];
   const all = store.entities.filter((e) => e.kind === kind);
   const unselected = all.filter((e) => !selected.includes(e.id));
-  const suggestions = (kind === "PARTY" ? SUGGESTED_PARTIES : kind === "DATA_SUBJECT" ? SUGGESTED_DATA_SUBJECTS : SUGGESTED_DATA_CATEGORIES).filter(
-    (s) => !all.some((e) => e.name.toLowerCase() === s.toLowerCase()),
-  );
+  const suggestions = def.noSuggestions
+    ? []
+    : (kind === "PARTY" ? SUGGESTED_PARTIES : kind === "DATA_SUBJECT" ? SUGGESTED_DATA_SUBJECTS : SUGGESTED_DATA_CATEGORIES).filter(
+        (s) => !all.some((e) => e.name.toLowerCase() === s.toLowerCase()),
+      );
 
   const choose = (id: string) => {
     if (multiple) store.edit(def.id, recordId, { value: selected.includes(id) ? selected : [...selected, id] });
@@ -939,7 +958,7 @@ function EntityManager({ kind }: { kind: "PARTY" | "DATA_SUBJECT" | "DATA_CATEGO
               <div className="mt-2 rounded border border-amber-400 bg-amber-50 p-2">
                 <p className="font-medium">“{e.name}” is still used in:</p>
                 <ul className="list-disc pl-5">
-                  {[...new Set(refs.list.map((r) => `${r.label} (section ${r.subsectionId})`))].map((t) => (
+                  {[...new Set(refs.list.map((r) => `${r.label} (section ${subsectionLabel(r.subsectionId)})`))].map((t) => (
                     <li key={t}>{t}</li>
                   ))}
                 </ul>
@@ -970,5 +989,153 @@ function EntityManager({ kind }: { kind: "PARTY" | "DATA_SUBJECT" | "DATA_CATEGO
         </p>
       ) : null}
     </details>
+  );
+}
+
+// ------------------------------------------------------------------ simplified controls
+
+/** Shown instead of the answer-options control: keeps an existing unresolved state visible, never changes it silently. */
+function StateNotice({
+  def,
+  f,
+  state,
+  disabled,
+  recordId,
+}: {
+  def: FieldDef;
+  f: FieldState | undefined;
+  state: AnswerState;
+  disabled: boolean;
+  recordId: string;
+}) {
+  const { store } = useStoreCtx();
+  if (state === "ANSWERED" || state === "UNANSWERED") return null;
+  const unresolved = state === "NOT_SURE" || state === "COMPLETE_LATER";
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+      <span className={unresolved ? "chip-warn" : "chip-neutral"}>
+        {STATE_LABEL[state]}
+        {unresolved ? " — unresolved, not “No”" : ""}
+      </span>
+      {!disabled ? (
+        <button
+          type="button"
+          className="btn-link"
+          onClick={() => store.edit(def.id, recordId, { state: isEmptyValue(def, f?.value) ? "UNANSWERED" : "ANSWERED" })}
+        >
+          Mark as answered
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/** Subsection-level help request. Opening it changes nothing; the checkbox marks it, "Clear" removes it. */
+function HelpRequest({ def, recordId, disabled }: { def: FieldDef; recordId: string; disabled: boolean }) {
+  const { store } = useStoreCtx();
+  useStoreRev(store);
+  const uid = useId();
+  const f = store.get(def.id, recordId);
+  const active = f?.value === true;
+  return (
+    <details className="max-w-prose2 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm">
+      <summary className="cursor-pointer font-medium text-brand-700">
+        Not sure – I need help
+        {active ? <span className="chip-warn ml-2">Help requested — unresolved</span> : null}
+      </summary>
+      <div className="mt-2 space-y-2">
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            className="h-4 w-4"
+            checked={active}
+            disabled={disabled}
+            onChange={(e) => store.edit(def.id, recordId, { value: e.target.checked })}
+          />
+          I need help with this section
+        </label>
+        <div>
+          <label htmlFor={`${uid}-c`} className="font-medium">
+            Comment (optional)
+          </label>
+          <AutoTextarea
+            id={`${uid}-c`}
+            value={f?.rationale ?? ""}
+            disabled={disabled}
+            rows={2}
+            onChange={(v) => store.edit(def.id, recordId, { rationale: v }, false)}
+          />
+        </div>
+        {active && !disabled ? (
+          <button type="button" className="btn-link" onClick={() => store.edit(def.id, recordId, { value: false })}>
+            Clear help request
+          </button>
+        ) : null}
+        <p className="help-text">
+          A help request keeps this section unresolved until you clear it. Opening this panel does not change any answer.
+        </p>
+      </div>
+    </details>
+  );
+}
+
+/** Single-select for a shared party (controllers). Saved custom names stay selectable. */
+function EntitySelect({ id, def, recordId, disabled }: { id: string; def: FieldDef; recordId: string; disabled: boolean }) {
+  const { store } = useStoreCtx();
+  useStoreRev(store);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const value = typeof store.get(def.id, recordId)?.value === "string" ? (store.get(def.id, recordId)!.value as string) : "";
+  const parties = store.entities.filter((e) => e.kind === "PARTY");
+  const named = (n: string) => parties.find((e) => e.name.toLowerCase() === n.toLowerCase());
+  const extras = parties.filter((e) => !CONTROLLER_CHOICES.some((c) => c.toLowerCase() === e.name.toLowerCase()));
+  const known = value === "" || parties.some((e) => e.id === value);
+  return (
+    <div>
+      <select
+        id={id}
+        className="input"
+        disabled={disabled || busy}
+        value={value}
+        onChange={async (e) => {
+          const v = e.target.value;
+          setMsg(null);
+          if (v.startsWith("new:")) {
+            setBusy(true);
+            const res = await store.createEntity("PARTY", v.slice(4));
+            setBusy(false);
+            if (res.entity) store.edit(def.id, recordId, { value: res.entity.id });
+            else setMsg(res.error ?? "Could not add the entry.");
+          } else {
+            store.edit(def.id, recordId, { value: v });
+          }
+        }}
+      >
+        <option value="">Select…</option>
+        {CONTROLLER_CHOICES.map((c) => {
+          const ex = named(c);
+          return (
+            <option key={c} value={ex ? ex.id : `new:${c}`}>
+              {c}
+            </option>
+          );
+        })}
+        {extras.length ? (
+          <optgroup label="Existing entries">
+            {extras.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name}
+              </option>
+            ))}
+          </optgroup>
+        ) : null}
+        {!known ? <option value={value}>(removed entry)</option> : null}
+      </select>
+      {msg ? (
+        <p role="alert" className="mt-1 text-sm font-medium text-red-800">
+          {msg}
+        </p>
+      ) : null}
+    </div>
   );
 }

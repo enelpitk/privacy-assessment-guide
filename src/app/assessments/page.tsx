@@ -49,7 +49,7 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
     return (
       <main id="main" className="mx-auto max-w-[88rem] px-4 py-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold">Assessment register</h1>
+          <h1 className="text-xl font-semibold">Assessment register</h1>
           {isOwner ? (
             <Link className="btn-primary" href="/assessments/new">
               New assessment

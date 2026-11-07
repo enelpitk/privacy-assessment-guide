@@ -78,6 +78,14 @@ export interface FieldDef {
   computed?: "inherentScore" | "residualScore" | "targetScore" | "owner" | "displayId" | "dpoName";
   maxLength?: number;
   placeholder?: string;
+  /** Stored and exported, but not shown in the questionnaire and never counted. */
+  hidden?: boolean;
+  /** A subsection-level "Not sure – I need help" request. Active (true) means unresolved. */
+  helpRequest?: boolean;
+  /** Hide the suggestion list in the entity picker. */
+  noSuggestions?: boolean;
+  /** Render a single entity as a single-select control. */
+  ui?: "select";
 }
 
 export interface CollectionDef {
@@ -96,6 +104,12 @@ export interface CollectionDef {
   workflow?: WorkflowOwner;
   workflowNote?: string;
   help?: Help;
+  /** Compact record cards: restrained add/remove links, no reordering controls. */
+  compact?: boolean;
+  /** Each record is an expandable block with a plus/minus indicator. */
+  collapsible?: boolean;
+  /** One expandable "Guidance" shown inside each record. */
+  guidance?: string;
 }
 
 export type InfoBlock =
@@ -135,6 +149,14 @@ export interface SubsectionDef {
   items: Item[];
   activeWhen?: Cond;
   covers?: string[];
+  /**
+   * "field" (default): per-question answer options.
+   * "none": no answer-option controls.
+   * "help": one subsection-level "Not sure – I need help" request instead of per-question options.
+   */
+  answerControls?: "field" | "none" | "help";
+  /** Do not show the collapsible "About this section" panel. */
+  noAbout?: boolean;
 }
 
 export interface StageDef {

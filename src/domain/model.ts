@@ -124,6 +124,16 @@ function walk(
     if (item.kind === "info") continue;
     if (!isItemActive(item, ctx, recordId)) continue;
     if (item.kind === "field") {
+      if (item.hidden) continue;
+      if (item.helpRequest) {
+        // An active help request is an unresolved item until the user clears it.
+        if (ctx.get(item.id, recordId)?.value === true) {
+          out.required++;
+          out.unresolved++;
+          out.gaps.push({ fieldId: item.id, recordId, label: "Help requested for this section", status: "UNRESOLVED_NOT_SURE" });
+        }
+        continue;
+      }
       if (item.type === "computed" || item.workflow || item.optional) continue;
       out.required++;
       const st = fieldStatus(item, ctx.get(item.id, recordId), ctx, recordId);

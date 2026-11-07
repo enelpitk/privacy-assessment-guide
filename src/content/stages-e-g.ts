@@ -122,7 +122,7 @@ export const STAGE_E: StageDef = {
             multi("E.purpose.basis", "Lawful basis — Article 6(1) GDPR", ART6_BASES, {
               covers: ["E.purpose.art6Ref"],
               help: {
-                inline: "For the full legal text, refer to Article 6(1) GDPR. Select every basis that applies to this purpose.",
+                essential: true, inline: "For the full legal text, refer to Article 6(1) GDPR. Select every basis that applies to this purpose.",
                 explain:
                   "If special category data or criminal offence data is processed, also complete the next subsection (special category and criminal offence data).",
               },

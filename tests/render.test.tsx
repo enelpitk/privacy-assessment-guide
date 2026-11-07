@@ -81,9 +81,10 @@ describe("render smoke test: every subsection renders", () => {
 });
 
 describe("progressive disclosure", () => {
-  it("shows the real identifier compactly, never 'Pending' for it", () => {
+  it("hides the assessment identifier in the questionnaire view", () => {
     const html = render("A1", pageStub());
-    expect(html).toContain("DPIA-2026-0001");
+    expect(html).not.toContain("DPIA-2026-0001");
+    expect(html).not.toContain("Assessment identifier");
     expect(html).not.toContain("Generated automatically");
   });
 
@@ -100,9 +101,9 @@ describe("progressive disclosure", () => {
   });
 
   it("keeps essential qualifications visible outside the guidance control", () => {
-    const html = render("A2", pageStub());
+    const html = render("E1", pageWithRecords());
     const visible = html.replace(/<details[\s\S]*?<\/details>/g, "");
-    expect(visible).toContain("Select all that apply.");
+    expect(visible).toContain("Select every basis that applies");
   });
 
   it("does not repeat the subsection description under the heading", () => {
@@ -149,5 +150,128 @@ describe("progressive disclosure", () => {
   it("shows the pending note once per subsection, not on every pending field", () => {
     const html = render("C9", pageStub());
     expect(html.match(/<strong>Pending:<\/strong>/g)).toHaveLength(1);
+  });
+});
+
+describe("visible numbering", () => {
+  it("shows 1-11 and 1.1 style labels, never 'Stage' or letters, in headings and navigation text", () => {
+    const html = render("A1", pageStub()).replace(/<!-- -->/g, "");
+    expect(html).toContain("1. General information");
+    expect(html).toContain("1.1 Processing");
+    expect(html).not.toMatch(/Stage [A-K]\b/);
+    const c9 = render("C9", pageStub()).replace(/<!-- -->/g, "");
+    expect(c9).toContain("3. Pre-assessment");
+    expect(c9).toContain("3.10 DPO screening decision");
+    expect(c9).not.toContain("C9 ·");
+  });
+});
+
+describe("1 Processing and Reason: no answer options", () => {
+  it("has no Answer options anywhere in 1.1 and 1.2 but keeps the inputs", () => {
+    for (const sub of ["A1", "A2"]) {
+      const html = render(sub, pageStub());
+      expect(html, sub).not.toContain("Answer options");
+      expect(html, sub).not.toContain("Complete later");
+    }
+    expect(render("A1", pageStub())).toContain("Name of the processing");
+    expect(render("A1", pageStub())).toContain("General description - brief summary of what the processing involves");
+  });
+  it("removes 'Select all that apply' and the manual-entry sentence but keeps the previous reference field", () => {
+    const html = render("A2", pageStub());
+    expect(html).not.toContain("Select all that apply");
+    expect(html).not.toContain("Existing assessments are entered manually");
+    expect(html).toContain("Previous assessment reference");
+    expect(html).toContain("Mandated by law");
+  });
+});
+
+describe("2.1 Controllers", () => {
+  const page = () =>
+    pageStub({
+      records: [{ id: "c1", collection: "B.ctrl", parentId: null, ordering: 0, revision: 1 }],
+      entities: [
+        { id: "e1", kind: "PARTY", name: "Harbour Bank", revision: 1 },
+        { id: "e2", kind: "PARTY", name: "Legacy Custom Holding", revision: 1 },
+      ],
+      fields: {
+        "B.ctrl.name|c1": { value: "e2", state: "ANSWERED", rationale: null, revision: 1, editorName: "A", lastEditedAt: "2026-11-07T10:00:00.000Z" },
+        "B.ctrl.kind|c1": { value: "JOINT", state: "ANSWERED", rationale: null, revision: 1, editorName: "A", lastEditedAt: "2026-11-07T10:00:00.000Z" },
+      },
+    });
+
+  it("shows a compact controller record with a Select control and roles", () => {
+    const html = render("B1", page()).replace(/<!-- -->/g, "");
+    expect(html).toContain("Controller 1");
+    expect(html).toContain(">Select<");
+    expect(html).toContain("Roles and responsibilities");
+    expect(html).toContain("+ Add a new Controller");
+    expect(html).toContain("Harbour Insurance");
+    expect(html).toContain("Harbour Asset Management");
+    expect(html).toContain("Harbour Bank");
+    expect(html).toContain("Not sure – I need help");
+  });
+  it("keeps saved custom controller names readable and selected", () => {
+    const html = render("B1", page());
+    expect(html).toContain("Legacy Custom Holding");
+    expect(html).toMatch(/<option[^>]*value="e2"[^>]*selected|<option[^>]*selected[^>]*value="e2"/);
+  });
+  it("removes the type radios, the no-joint checkbox, top-level guidance and status controls", () => {
+    const html = render("B1", page());
+    expect(html).not.toContain("There are no joint controllers");
+    expect(html).not.toContain("Joint controller");
+    expect(html).not.toContain("Answer options");
+    expect(html).not.toContain("Complete later");
+    expect(html).not.toContain("About this section");
+    expect((html.match(/>Guidance</g) ?? []).length).toBe(1); // one Guidance per record
+  });
+});
+
+describe("2.2 Processors", () => {
+  const page = () =>
+    pageStub({
+      records: [
+        { id: "p1", collection: "B.proc", parentId: null, ordering: 0, revision: 1 },
+        { id: "s1", collection: "B.sub", parentId: "p1", ordering: 0, revision: 1 },
+      ],
+    });
+
+  it("keeps the checkbox, drops the instruction sentence, suggestions and Add buttons", () => {
+    const html = render("B2", page());
+    expect(html).toContain("No processors are involved");
+    expect(html).not.toContain("Tick this if no processor");
+    expect(html).not.toContain("Suggestions");
+    expect(html).not.toMatch(/Add “/);
+    expect(html).not.toContain("Answer options");
+    expect(html).not.toContain("Complete later");
+  });
+  it("presents a grouped record in order with the sub-processor nested under its processor", () => {
+    const html = render("B2", page()).replace(/<!-- -->/g, "");
+    const i = (t: string) => html.indexOf(t);
+    expect(i("Processor name")).toBeGreaterThan(-1);
+    expect(i("Processor name")).toBeLessThan(i("Roles and responsibilities"));
+    expect(i("Roles and responsibilities")).toBeLessThan(i("Data processing agreement (DPA) reference"));
+    expect(i("Data processing agreement (DPA) reference")).toBeLessThan(i("Sub-processor 1"));
+    expect(html).toContain("+ Add processor");
+    expect(html).toContain("+ Add sub-processor");
+    expect(html).toContain("Processor 1");
+  });
+  it("a help request shows as active but opening the control alone changes nothing", () => {
+    const withHelp = pageStub({
+      fields: { "B2.help|": { value: true, state: "ANSWERED", rationale: "Unsure about hosting", revision: 1, editorName: "A", lastEditedAt: "2026-11-07T10:00:00.000Z" } },
+    });
+    const html = render("B2", withHelp);
+    expect(html).toContain("Help requested — unresolved");
+    expect(html).toContain("Unsure about hosting");
+    expect(html).toContain("Clear help request");
+    expect(render("B2", pageStub())).not.toContain("Help requested");
+  });
+  it("keeps an existing unresolved state visible with an explicit way to mark it answered", () => {
+    const p = pageStub({
+      records: [{ id: "p1", collection: "B.proc", parentId: null, ordering: 0, revision: 1 }],
+      fields: { "B.proc.role|p1": { value: "Hosts data", state: "NOT_SURE", rationale: null, revision: 1, editorName: "A", lastEditedAt: "2026-11-07T10:00:00.000Z" } },
+    });
+    const html = render("B2", p).replace(/<!-- -->/g, "");
+    expect(html).toContain("Not sure — I need help — unresolved, not “No”");
+    expect(html).toContain("Mark as answered");
   });
 });

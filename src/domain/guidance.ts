@@ -27,6 +27,9 @@ export function shortAnswerHint(text: string | undefined, minWords = 5): string 
   return "This answer is very short. Consider adding detail so a reader unfamiliar with the project can follow it.";
 }
 
+/** Controller choices offered in the single-select, in the order requested. */
+export const CONTROLLER_CHOICES = ["Harbour Insurance", "Harbour Asset Management", "Harbour Bank"];
+
 export const SUGGESTED_PARTIES = [
   "Harbour Bank",
   "Harbour Insurance",

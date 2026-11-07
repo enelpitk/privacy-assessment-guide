@@ -21,6 +21,19 @@ export const STAGES: StageDef[] = [
 
 export const SUBSECTIONS: SubsectionDef[] = STAGES.flatMap((s) => s.subsections);
 
+/** Visible section number (1-11). Internal ids (A-K) never change. */
+export function stageNumber(stageId: string): number {
+  return STAGES.findIndex((s) => s.id === stageId) + 1;
+}
+
+/** Visible subsection label such as "3.1". Internal ids (C0, C1 ...) never change. */
+export function subsectionLabel(subsectionId: string): string {
+  const sub = SUBSECTIONS.find((s) => s.id === subsectionId);
+  if (!sub) return subsectionId;
+  const st = STAGES.find((s) => s.id === sub.stage)!;
+  return `${stageNumber(st.id)}.${st.subsections.indexOf(sub) + 1}`;
+}
+
 export const subsectionById = new Map(SUBSECTIONS.map((s) => [s.id, s]));
 
 export interface FieldLocation {
