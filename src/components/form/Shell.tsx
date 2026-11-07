@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { STAGES, stageNumber, subsectionById, subsectionLabel } from "@/content";
+import { openQuestions } from "@/domain/openQuestions";
 import { buildModel, evaluateAssessment, evaluateSubsection, stageProgress } from "@/domain/model";
 import { LIFECYCLE_LABEL, SCREENING_LABEL } from "@/lib/labels";
 import type { PageData } from "@/lib/types";
@@ -350,6 +351,8 @@ export function Overview() {
         </p>
       </section>
 
+      <OpenQuestionsCard result={result} />
+
       <section className="card">
         <h2 className="text-lg font-semibold">Progress by stage</h2>
         <ul className="mt-2 divide-y divide-slate-200">
@@ -390,5 +393,68 @@ export function Overview() {
         </ul>
       </section>
     </div>
+  );
+}
+
+function OpenQuestionsCard({ result }: { result: ReturnType<typeof evaluateAssessment> }) {
+  const { page, navigate } = useStoreCtx();
+  const oq = openQuestions(result);
+  const go = (id: string) => `/assessments/${page.assessment.id}/s/${id}`;
+  const kindText = { NOT_SURE: "Not sure", COMPLETE_LATER: "Complete later", HELP_REQUEST: "Help requested", INCOMPLETE: "Incomplete" } as const;
+  return (
+    <section className="card" aria-label="Open questions">
+      <h2 className="text-lg font-semibold">Open questions</h2>
+      <p className="help-text mt-1">
+        Unresolved items are ones you marked “Not sure”, “Complete later” or asked for help with. They are not the same as “No”. This counts completeness, not compliance.
+      </p>
+      {oq.unresolved.length === 0 ? (
+        <p className="mt-2 text-sm">No unresolved items.</p>
+      ) : (
+        <ul className="mt-2 space-y-1.5 text-sm">
+          {oq.unresolved.slice(0, 40).map((u, i) => (
+            <li key={`${u.fieldId}|${u.recordId}|${i}`}>
+              <span className="chip-warn mr-2">{kindText[u.kind]}</span>
+              <a
+                className="btn-link"
+                href={go(u.subsectionId)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  void navigate(go(u.subsectionId));
+                }}
+              >
+                {subsectionLabel(u.subsectionId)} {u.label.length > 90 ? `${u.label.slice(0, 87)}…` : u.label}
+              </a>
+              {u.note ? <span className="block pl-1 text-ink-soft">“{u.note}”</span> : null}
+            </li>
+          ))}
+          {oq.unresolved.length > 40 ? <li className="text-ink-soft">…and {oq.unresolved.length - 40} more.</li> : null}
+        </ul>
+      )}
+      <p className="mt-3 text-sm">
+        <strong>{oq.incompleteTotal}</strong> applicable item{oq.incompleteTotal === 1 ? " is" : "s are"} still unanswered.
+      </p>
+      {oq.incompleteBySubsection.length ? (
+        <details className="mt-1 text-sm">
+          <summary className="w-fit cursor-pointer text-brand-700">Where</summary>
+          <ul className="mt-1 columns-1 sm:columns-2">
+            {oq.incompleteBySubsection.map(({ subsection, count }) => (
+              <li key={subsection.id}>
+                <a
+                  className="btn-link"
+                  href={go(subsection.id)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    void navigate(go(subsection.id));
+                  }}
+                >
+                  {subsectionLabel(subsection.id)} {subsection.title}
+                </a>{" "}
+                ({count})
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </section>
   );
 }

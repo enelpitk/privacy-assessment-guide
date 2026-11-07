@@ -8,6 +8,7 @@ import {
   link,
   longtext,
   multi,
+  note,
   opt,
   pending,
   quantity,
@@ -261,11 +262,10 @@ export const STAGE_C: StageDef = {
           "Approximately how many individuals have special category or criminal conviction/offence data processed? (Count each person once.)",
           { help: quantityHelp, optional: true },
         ),
-        pending(
-          "C.inputs.pending",
-          "Suggested screening answers",
-          "Suggested answers derived from these counts are not available yet; they arrive in Stage 3. Until then, answer each screening question yourself and give your rationale.",
-          3,
+        note(
+          "C.inputs.note",
+          "How these counts are used",
+          "Questions 3.2 to 3.8 show a suggested answer worked out from these counts and your other entries. A suggestion is never applied for you: you confirm it or give your own answer.",
         ),
       ],
     },
@@ -281,6 +281,8 @@ export const STAGE_C: StageDef = {
         include: "Which kinds of data, roughly how many individuals, and how you counted.",
       },
       items: [
+        info("C.sug.q1", "suggestion", { ref: "q1", added: true }),
+        text("C.q1.suggested", "Suggestion record", { hidden: true, optional: true, added: true }),
         yesno(
           "C.q1",
           "Will the processing involve special category data or criminal convictions and offence data relating to 5000 or more individuals? (special category data includes health, biometric, genetic, racial/ethnic origin, political opinions, religious beliefs, trade union membership, sex life or sexual orientation)",
@@ -302,6 +304,8 @@ export const STAGE_C: StageDef = {
           "Illustration only: automated credit scoring, HR ranking algorithms, automated assessment of insurance risk, fraud risk profiling.",
       },
       items: [
+        info("C.sug.q2", "suggestion", { ref: "q2", added: true }),
+        text("C.q2.suggested", "Suggestion record", { hidden: true, optional: true, added: true }),
         yesno(
           "C.q2",
           "Will you conduct systematic and extensive evaluations or scoring, including profiling of individuals which are based on automated processing, where this evaluation or prediction results in legal consequences or has a similarly significant impact on them? (e.g., automated credit scoring, HR ranking algorithms, automated assessment of insurance risk, fraud risk profiling)",
@@ -333,6 +337,8 @@ export const STAGE_C: StageDef = {
           "Illustration only: deploying machine learning to assess creditworthiness or insurance risk in place of or alongside traditional scoring methods; using generative AI to process personal data in ways not previously assessed; applying facial recognition in a new context.",
       },
       items: [
+        info("C.sug.q3", "suggestion", { ref: "q3", added: true }),
+        text("C.q3.suggested", "Suggestion record", { hidden: true, optional: true, added: true }),
         yesno(
           "C.q3",
           "Will the processing involve new technologies or apply existing technologies in a new way? (e.g., deploying machine learning to assess creditworthiness or insurance risk in place of or alongside traditional scoring methods, using generative AI to process personal data in ways not previously assessed, applying facial recognition in a new context)",
@@ -351,6 +357,8 @@ export const STAGE_C: StageDef = {
         example: "Illustration only: CCTV networks covering public streets.",
       },
       items: [
+        info("C.sug.q4", "suggestion", { ref: "q4", added: true }),
+        text("C.q4.suggested", "Suggestion record", { hidden: true, optional: true, added: true }),
         yesno(
           "C.q4",
           "Will the processing involve systematic and large-scale monitoring of a publicly accessible area? (e.g., CCTV networks covering public streets)",
@@ -381,12 +389,15 @@ export const STAGE_C: StageDef = {
           "In this template, question 5 applies when the processing involves the personal data of 10 000 or more individuals and potentially creates one or more of the listed risks. In this application each sub-question 5.1 to 5.6 is checked separately: the specific risk must apply AND it must apply to 10 000 or more individuals. Counts are not added across sub-questions. The examples are illustrations, not complete definitions. Count the individuals to whom the actual risk applies.",
       },
       items: [
+        info("C.sug.q5", "suggestion", { ref: "q5", added: true }),
+        text("C.q5.suggested", "Suggestion record", { hidden: true, optional: true, added: true }),
         yesno(
           "C.q5",
           "Q5. Will the processing involve the personal data of 10 000 or more individuals and potentially create one or more of the following risks?",
           { help: { inline: "Your confirmed answer for question 5 as a whole. Suggested answers from the sub-questions arrive in Stage 3." } },
         ),
         longtext("C.q5.rationale", "Rationale for question 5"),
+        info("C.q5.table", "q5table", { added: true }),
         info("C.q5.h1", "text", { title: "5.1 – Financial data", added: true }),
         yesno("C.q5.s1", "5.1 Processing may lead to exposure to financial data", {
           help: {
@@ -493,6 +504,8 @@ export const STAGE_C: StageDef = {
           "The template asks about other personal data “not already covered by questions above”. It is not clear whether that means different individuals or different data, so if you answered Yes to any of questions 1 to 5 please explain your reasoning; the DPO will review it.",
       },
       items: [
+        info("C.sug.q6", "suggestion", { ref: "q6", added: true }),
+        text("C.q6.suggested", "Suggestion record", { hidden: true, optional: true, added: true }),
         yesno(
           "C.q6",
           "6. Will the processing involve any other personal data relating to 50 000 or more individuals not already covered by questions above?",
@@ -511,6 +524,8 @@ export const STAGE_C: StageDef = {
           "This includes onward transfer to sub-processors, cloud providers, support teams or group companies located outside the EU/EEA. A Yes here triggers a Transfer Impact Assessment (TIA), which is separate from and additional to any DPIA obligation. A Yes to this question alone does not indicate a full DPIA.",
       },
       items: [
+        info("C.sug.q7", "suggestion", { ref: "q7", added: true }),
+        text("C.q7.suggested", "Suggestion record", { hidden: true, optional: true, added: true }),
         yesno(
           "C.q7",
           "7. Will the data be shared with or accessible by a third party outside of the EU/EEA? (This includes onward transfer to sub-processors, cloud providers, support teams, or group companies located outside the EU/EEA. A Yes here triggers a Transfer Impact Assessment (TIA), which is separate from and additional to any DPIA obligation)",

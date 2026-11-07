@@ -3,6 +3,7 @@ import {
   collection,
   date,
   field,
+  flag,
   info,
   link,
   longtext,
@@ -285,6 +286,7 @@ export const STAGE_J: StageDef = {
       intro:
         "Describe each risk by what could go wrong, who could be affected and what harm they could suffer. Focus on harm to individuals, not only losses to the organisation. Current residual risk must reflect measures that are already implemented; planned measures belong in the target risk.",
       items: [
+        info("J.summary", "riskSummary", { added: true }),
         info("J.examples", "riskExamples", { added: true }),
         collection(
           "J.risk",
@@ -292,6 +294,11 @@ export const STAGE_J: StageDef = {
           "Risk",
           [
             text("J.risk.name", "Risk name"),
+            text("J.risk.fromExample", "Started from example", { hidden: true, optional: true, added: true }),
+            flag("J.risk.confirmed", "I have adapted this example to my processing and confirm it", {
+              added: true,
+              activeWhen: { f: "J.risk.fromExample", nonEmpty: true, scope: "record" },
+            }),
             longtext("J.risk.description", "What could go wrong?", {
               sourceText: "Risk Description — What could happen, who could be affected, and what harm could result?",
             }),
@@ -424,6 +431,7 @@ export const STAGE_K: StageDef = {
           "Template rule: consultation is “Required if residual risks remain HIGH after mitigation measures are applied and cannot be reduced further.” If the supervisory authority has been consulted, describe the reason and record its response or recommendations. A risk score alone does not decide this; the DPO and owner assess it.",
       },
       items: [
+        info("K.consult", "consultFlag", { added: true }),
         yesno("K.sa.consulted", "Has the supervisory authority been consulted?"),
         longtext("K.sa.details", "Reason for consultation, and the authority’s response or recommendations", {
           added: true,

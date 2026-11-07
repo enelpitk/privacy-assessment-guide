@@ -33,12 +33,13 @@ Everything in the table below is still unverified on Railway unless stated here.
 | Responsive layout, keyboard and screen-reader behaviour | Partly | Not tested | Not verified | Written with labels, fieldsets, focus styles; no audit done |
 | Health endpoint `/api/health` | Yes | Built | Limited manual check: ok/ok | See the manual verification table |
 | Progressive disclosure in the form (guidance, examples, original wording and answer options behind labelled controls; no routine per-field Saved/last-edited text; one save indicator in the header; no Owner item in the questionnaire) | Yes | Render tests (92 tests total), build | Not verified | Not seen in a browser. Editor names and timestamps are still stored and loaded, just not shown. Owner is mapped to `A.owner` in the inventory and will be exported from the owner relationship (Stage 5) |
+| Stage 3: explainable screening suggestions, Q5 per-sub-question logic, independent DPIA/TIA indications, unresolved list, provisional Q6 flag, suggestion snapshots | Yes | 41 screening/risk tests + render + store + server-save (fake DB) tests | Not verified | Pure rules tested thoroughly; UI never seen in a browser |
+| Stage 3: guided risk register (example starting points that must be confirmed, measures, calculated inherent/current residual/target, labelled matrix, overdue labels, consultation prompt) and open-questions summary | Yes | Domain + render tests | Not verified | Overdue notifications are not built yet (labels only) |
 | Visible numbering 1–11 / 1.1, compact typography, simplified sections 1.1, 1.2, 2.1, 2.2 (help-request control, compact grouped records, controller select) | Yes | Domain + render tests (105 tests total), type check, build | Not verified | Not seen in a browser; typography, spacing and mobile usability need a visual check |
 | Collapsible navigation panel (preference kept in the browser, not assessment data) | Yes | Toggle label/ARIA test; build | Not verified | Default open on desktop, collapsed on mobile; not seen in a browser by me |
 
 ## Not built yet (clearly shown as pending in the UI)
 
-- **Stage 3:** suggested screening answers, automatic DPIA/TIA outcomes, guided risk register UX (example picker, plotted matrix), open-question summaries.
 - **Stage 4:** assignments UI, comments, submission snapshots, DPO review and opinions, owner decision and conditions, revisions, archive/delete, ownership transfer, event history, review-date logging.
 - **Stage 5:** notifications, reports and JSON export, seeded scenarios, demo guide, wording demonstration, glossary, admin reset, accessibility pass.
 - **Stage 6:** Railway deployment and acceptance testing.

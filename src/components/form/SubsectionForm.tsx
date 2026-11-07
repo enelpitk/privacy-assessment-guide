@@ -27,18 +27,11 @@ import { isEmptyValue } from "@/domain/validation";
 import { fieldKey } from "@/lib/types";
 import { useStoreCtx, useStoreRev } from "./context";
 import { FieldBlock, useFormat } from "./Fields";
+import { ConsultFlag, RiskExamplesPicker, RiskSummary } from "./Risk";
+import { Q5Table, ScreeningOutcomes, SuggestionBlock } from "./Screening";
+import { useModel } from "./useModel";
 
-export function useModel() {
-  const { store } = useStoreCtx();
-  useStoreRev(store);
-  const rows: RecordRow[] = store.records.map((r) => ({
-    id: r.id,
-    collection: r.collection,
-    parentId: r.parentId,
-    ordering: r.ordering,
-  }));
-  return buildModel(store.responses(), rows);
-}
+export { useModel } from "./useModel";
 
 // ------------------------------------------------------------------ main component
 
@@ -412,6 +405,9 @@ function CollectionEditor({
               <h4 className="font-semibold">
                 {col.itemLabel} {i + 1}
                 {titleOf(r.id) ? <span className="font-normal text-ink-soft"> — {titleOf(r.id)}</span> : null}
+                {col.id === "J.risk.measure" && measureOverdue(store, r.id) ? (
+                  <span className="chip-bad ml-2">Overdue since {String(store.get("J.risk.due", r.id)?.value)}</span>
+                ) : null}
               </h4>
               {perm.ok ? (
                 <div className="flex flex-wrap items-center gap-2">
@@ -486,11 +482,20 @@ function InfoView({ info }: { info: InfoDef }): ReactNode {
   useStoreRev(store);
   switch (info.block) {
     case "text":
-      return info.title ? (
-        <h3 className="mt-2 text-base font-semibold">{info.title}</h3>
-      ) : (
-        <p>{info.body}</p>
+      return (
+        <div>
+          {info.title ? <h3 className="mt-2 text-base font-semibold">{info.title}</h3> : null}
+          {info.body ? <p className={info.title ? "help-text mt-1 max-w-prose2" : ""}>{info.body}</p> : null}
+        </div>
       );
+    case "suggestion":
+      return <SuggestionBlock qid={(info.ref ?? "q1") as "q1"} />;
+    case "q5table":
+      return <Q5Table />;
+    case "riskSummary":
+      return <RiskSummary />;
+    case "consultFlag":
+      return <ConsultFlag />;
     case "pending":
       return (
         <div className="rounded-md border border-dashed border-slate-400 bg-slate-50 p-3">
@@ -512,7 +517,7 @@ function InfoView({ info }: { info: InfoDef }): ReactNode {
     case "riskLegend":
       return <RiskLegend />;
     case "riskExamples":
-      return <RiskExamples />;
+      return <RiskExamplesPicker />;
     case "versionHistory":
       return (
         <div className="overflow-x-auto">
@@ -681,94 +686,8 @@ function RiskLegend() {
   );
 }
 
-function RiskExamples() {
-  const ex = [
-    {
-      n: "Processing without legal basis",
-      d: "Data subjects have no knowledge their data is being used, no ability to consent, object, or exercise rights.",
-      s: "Inherent 3 × 2 = 6 MEDIUM. Measures: disclaimer on personal data processing, link to privacy policy. Residual 2 × 2 = 4 LOW.",
-    },
-    {
-      n: "Unauthorised access by third party",
-      d: "Personal data leaked or stolen due to cyberattack. The data subject could become a target for fraudulent activities.",
-      s: "Inherent 3 × 4 = 12 HIGH. Measures: encryption at rest and in transit, DLP tools. Residual 2 × 4 = 8 MEDIUM, with additional measures described.",
-    },
-    {
-      n: "Third-party processor risk",
-      d: "Processor fails to provide adequate security or compliance guarantees.",
-      s: "Inherent 4 × 4 = 16 HIGH. Residual 3 × 4 = 12 HIGH, with additional measures described.",
-    },
-  ];
-  return (
-    <details className="rounded-md border border-slate-200 bg-white p-3">
-      <summary className="cursor-pointer font-medium text-brand-700">Example risks from the template (guidance, not your risks)</summary>
-      <p className="help-text mt-1">
-        Adapt these to your own processing and describe the harm to individuals. They are never added to your register automatically.
-      </p>
-      <ul className="mt-2 space-y-2 text-sm">
-        {ex.map((e) => (
-          <li key={e.n} className="rounded border border-slate-200 p-2">
-            <strong>{e.n}.</strong> {e.d}
-            <br />
-            <span className="text-ink-soft">{e.s}</span>
-          </li>
-        ))}
-      </ul>
-    </details>
-  );
-}
-
-function ScreeningOutcomes() {
-  const { store } = useStoreCtx();
-  useStoreRev(store);
-  const fmt = useFormat();
-  const qs = ["C.q1", "C.q2", "C.q3", "C.q4", "C.q5", "C.q6", "C.q7"];
-  return (
-    <div className="space-y-3">
-      <div className="rounded-md border border-dashed border-slate-400 bg-slate-50 p-3">
-        <p className="font-semibold">
-          Automatic outcomes <span className="chip-neutral ml-1">Coming in Stage 3</span>
-        </p>
-        <p className="help-text mt-1">
-          The application does not yet work out “Full DPIA indicated”, “TIA follow-up indicated” or unresolved questions. Below are your confirmed answers and the template’s
-          outcome rules.
-        </p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[26rem] border-collapse text-left text-sm">
-          <caption className="mb-1 text-left font-semibold">Your confirmed screening answers</caption>
-          <tbody>
-            {qs.map((id) => {
-              const def = fieldIndex.get(id)!.def;
-              const f = store.get(id, "");
-              const label =
-                f?.state === "NOT_SURE"
-                  ? "Not sure — unresolved"
-                  : f?.state === "COMPLETE_LATER"
-                    ? "Complete later — unresolved"
-                    : f && !isEmptyValue(def, f.value)
-                      ? fmt(def, f.value)
-                      : "Not answered";
-              return (
-                <tr key={id} className="border-b border-slate-200">
-                  <th scope="row" className="py-1 pr-3 font-medium">
-                    Question {id.slice(-1)}
-                  </th>
-                  <td className="py-1">{label}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <ul className="list-disc space-y-1 pl-5 text-sm">
-        <li>If there are no ‘Yes’ answers, the pre-assessment is complete and no full DPIA is indicated by the screening results. The DPO can still require one.</li>
-        <li>
-          Questions 1–6: one or more ‘Yes’ — the processing is likely to result in a high risk to the rights and freedoms of individuals. A full DPIA is indicated, unless the
-          DPO records a justified exception.
-        </li>
-        <li>Question 7: ‘Yes’ — Transfer Impact Assessment (TIA) follow-up. This is separate from, and additional to, any DPIA indication.</li>
-      </ul>
-    </div>
-  );
+function measureOverdue(store: { get: (f: string, r: string) => { value: unknown } | undefined }, recordId: string): boolean {
+  const due = store.get("J.risk.due", recordId)?.value;
+  const status = store.get("J.risk.status", recordId)?.value;
+  return typeof due === "string" && due !== "" && due < new Date().toISOString().slice(0, 10) && status !== "COMPLETED";
 }

@@ -116,3 +116,19 @@ The full assessment (D–K) stays accessible to the DPO even when screening indi
 ## Change classes
 
 Defined in `docs/architecture.md` §5. The class table lives in `content/rules.ts` as `fieldChangeClass[fieldId]`. A test asserts that every inventory field has a class.
+
+
+## Implementation status (Stage 3)
+
+Implemented in `src/domain/screening.ts` and `src/domain/riskSummary.ts`, tested locally: `SCR-Q1-THRESHOLD`, `SCR-Q2`, `SCR-Q4`, `SCR-Q5-SUB`, `SCR-Q5-AGG`, `SCR-Q6-THRESHOLD` (with the provisional `Q6_NOT_ALREADY_COVERED` DPO flag), `SCR-Q7` (suggestion only), `OUT-FULL`, `OUT-TIA`, `OUT-UNRES`, `SCR-CONFIRM`, `RISK-SCALE-P/I`, `RISK-SCORE`, `RISK-CAT`, `RISK-INHERENT`, `RISK-RESIDUAL`, `RISK-TARGET`, `RISK-HIGH-RES`, `RISK-CONSULT` (a prompt from current residual HIGH only), `RISK-OVERDUE` (label only; notifications arrive later), `RISK-MATRIX`.
+
+Suggestion heuristics (all suggestions need user confirmation; they never change an answer):
+
+- **Q1** from the distinct special-category/criminal count in 3.1, or No if section 4.2 says no such data.
+- **Q2** from its three parts; **Q4** from its two parts; **Q3** has no derived suggestion.
+- **Q6** from the total population in 3.1; flagged when the population may be at least 50 000 and any of Q1 to Q5 is confirmed Yes.
+- **Q7** from recipient locations in section 4.7 using a short list of illustrative non-EU/EEA names. This is a convenience only; an unrecognised location stays unresolved, never No.
+
+Suggestion preservation: when a screening answer is confirmed or changed, the app stores `{rules, suggested, confirmed}` in a hidden record `C.qN.suggested` next to the answer, and the rationale is the existing `C.qN.rationale` field.
+
+Not yet implemented: submission of the screening for review, the DPO screening decision and exception, and automatic activation of stages D to K from the decision (Stage 4).

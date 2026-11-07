@@ -3,6 +3,8 @@
 import { fieldIndex } from "@/content";
 import type { AnswerState } from "@/domain/conditions";
 import type { RespRow } from "@/domain/model";
+import { buildModel } from "@/domain/model";
+import { evaluateScreening } from "@/domain/screening";
 import { isEmptyValue, validateValue } from "@/domain/validation";
 import {
   fieldKey,
@@ -196,6 +198,23 @@ export class AssessmentStore {
     f.error = def && hasValue ? (validateValue(def, f.value) ?? undefined) : f.error;
     this.emit();
     this.schedule();
+    // Keep the suggestion that applied when a screening answer was confirmed or changed.
+    if (recordId === "" && /^C\.q[1-7]$/.test(fieldId)) this.recordSuggestion(fieldId);
+  }
+
+  /** Stores {rules, suggested, confirmed} next to the confirmed answer, so the suggestion is preserved with it. */
+  private recordSuggestion(fieldId: string) {
+    const qid = fieldId.slice(2) as "q1";
+    const rows = this.records.map((r) => ({ id: r.id, collection: r.collection, parentId: r.parentId, ordering: r.ordering }));
+    const ev = evaluateScreening(buildModel(this.responses(), rows).ctx);
+    const q = ev.questions[qid];
+    const snapshot = JSON.stringify({
+      rules: ev.rulesVersion,
+      suggested: q.noSuggestion ? "NONE" : q.suggestion,
+      confirmed: q.confirmed,
+    });
+    if (this.get(`${fieldId}.suggested`)?.value === snapshot) return;
+    this.edit(`${fieldId}.suggested`, "", { value: snapshot });
   }
 
   private schedule() {
@@ -327,15 +346,21 @@ export class AssessmentStore {
     for (const [k, f] of this.fields) if (ids.has(f.recordId)) this.fields.delete(k);
   }
 
-  async addRecord(collection: string, parentId: string | null): Promise<string | null> {
+  async addRecordId(collection: string, parentId: string | null): Promise<{ id?: string; error?: string }> {
     const res = await call<ClientRecord>("POST", `/api/assessments/${this.assessmentId}/records`, {
       collection,
       parentId,
     });
-    if (!res.ok) return res.data.error ?? "Could not add the entry.";
-    this.records = [...this.records, res.data as ClientRecord];
+    if (!res.ok) return { error: res.data.error ?? "Could not add the entry." };
+    const rec = res.data as ClientRecord;
+    this.records = [...this.records, rec];
     this.emit();
-    return null;
+    return { id: rec.id };
+  }
+
+  async addRecord(collection: string, parentId: string | null): Promise<string | null> {
+    const r = await this.addRecordId(collection, parentId);
+    return r.error ?? null;
   }
 
   async removeRecord(recordId: string): Promise<string | null> {

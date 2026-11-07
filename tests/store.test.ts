@@ -169,3 +169,27 @@ describe("autosave store", () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("screening suggestion snapshots", () => {
+  it("preserves the suggestion next to the confirmed answer", () => {
+    const store = new AssessmentStore(pageStub({ fields: { "C.inputs.specialCount|": { ...saved(1, { min: 9000, max: 9000 }) } } }));
+    store.edit("C.q1", "", { value: "NO" }); // overrides a YES suggestion
+    const snap = JSON.parse(store.get("C.q1.suggested")!.value as string);
+    expect(snap).toEqual({ rules: "rules-1.0.0", suggested: "YES", confirmed: "NO" });
+    expect(store.get("C.q1.suggested")!.status).toBe("dirty");
+  });
+  it("updates the snapshot when the answer changes and does not loop", () => {
+    const store = new AssessmentStore(pageStub({ fields: { "C.inputs.specialCount|": { ...saved(1, { min: 9000, max: 9000 }) } } }));
+    store.edit("C.q1", "", { value: "NO" });
+    store.edit("C.q1", "", { value: "YES" });
+    expect(JSON.parse(store.get("C.q1.suggested")!.value as string).confirmed).toBe("YES");
+    store.edit("C.q3", "", { state: "NOT_SURE" });
+    expect(JSON.parse(store.get("C.q3.suggested")!.value as string)).toEqual({ rules: "rules-1.0.0", suggested: "NONE", confirmed: "UNRESOLVED" });
+  });
+  it("does not write snapshots for other fields", () => {
+    const store = new AssessmentStore(pageStub());
+    store.edit("A.description", "", { value: "x" });
+    expect([...store.fields.keys()].some((k) => k.includes("suggested"))).toBe(false);
+  });
+});
+

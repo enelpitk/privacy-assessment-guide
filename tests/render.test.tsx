@@ -68,7 +68,7 @@ describe("render smoke test: every subsection renders", () => {
   });
 
   it("states what is pending rather than implying it works", () => {
-    expect(render("C8", pageStub())).toContain("Coming in Stage 3");
+    expect(render("C8", pageStub())).not.toContain("Coming in Stage 3"); // implemented in Stage 3
     expect(render("C9", pageStub())).toContain("Pending:");
     expect(render("K4", pageStub())).toContain("Pending:");
   });
@@ -300,5 +300,93 @@ describe("2.2 Processors", () => {
     const html = render("B2", p).replace(/<!-- -->/g, "");
     expect(html).toContain("Not sure — I need help — unresolved, not “No”");
     expect(html).toContain("Mark as answered");
+  });
+});
+
+describe("Stage 3: screening suggestions and outcomes", () => {
+  const f = (value: unknown, state = "ANSWERED") => ({ value, state: state as "ANSWERED", rationale: null, revision: 1, editorName: "A", lastEditedAt: "2026-11-07T10:00:00.000Z" });
+
+  it("shows an explainable suggestion that is not applied until the user confirms it", () => {
+    const page = pageStub({ fields: { "C.inputs.specialCount|": f({ min: 9000, max: 9000 }) } });
+    const html = render("C1", page).replace(/<!-- -->/g, "");
+    expect(html).toContain("Suggested answer:");
+    expect(html).toContain("9,000 individuals with special category or criminal data");
+    expect(html).toContain("Use this suggestion: Yes");
+    expect(html).not.toContain("You have confirmed this suggestion");
+  });
+
+  it("shows the per-sub-question result table for question 5", () => {
+    const html = render("C5", pageStub()).replace(/<!-- -->/g, "");
+    expect(html).toContain("Question 5 – result for each sub-question");
+    expect(html).toContain("5.6 Real-time tracking of location or movement");
+    expect(html).toContain("Numbers are never added together");
+  });
+
+  it("shows 'Full DPIA indicated — awaiting DPO review' and the independent TIA indication", () => {
+    const page = pageStub({ fields: { "C.q1|": f("YES"), "C.q7|": f("YES"), "C.q2|": f(undefined, "NOT_SURE") } });
+    const html = render("C8", page).replace(/<!-- -->/g, "");
+    expect(html).toContain("Full DPIA indicated — awaiting DPO review");
+    expect(html).toContain("TIA follow-up indicated");
+    expect(html).toContain("Unresolved screening questions");
+    expect(html).toContain("marked “Not sure – I need help”");
+  });
+
+  it("question 7 alone indicates a TIA but not a full DPIA", () => {
+    const html = render("C8", pageStub({ fields: { "C.q7|": f("YES") } })).replace(/<!-- -->/g, "");
+    expect(html).toContain("TIA follow-up indicated");
+    expect(html).not.toContain("Full DPIA indicated");
+    expect(html).toContain("No confirmed indication yet");
+  });
+
+  it("explains the Q6 ambiguity for the DPO", () => {
+    const page = pageStub({ fields: { "C.inputs.population|": f({ min: 60000, max: 60000 }), "C.q1|": f("YES") } });
+    const html = render("C6", page).replace(/<!-- -->/g, "");
+    expect(html).toContain("For DPO review");
+    expect(html).toContain("different people or different data");
+  });
+});
+
+describe("Stage 3: risk register", () => {
+  const f = (value: unknown) => ({ value, state: "ANSWERED" as const, rationale: null, revision: 1, editorName: "A", lastEditedAt: "2026-11-07T10:00:00.000Z" });
+  const page = () =>
+    pageStub({
+      records: [
+        { id: "k1", collection: "J.risk", parentId: null, ordering: 0, revision: 1 },
+        { id: "m1", collection: "J.risk.measure", parentId: "k1", ordering: 0, revision: 1 },
+      ],
+      fields: {
+        "J.risk.name|k1": f("Unauthorised access"),
+        "J.risk.inh.p|k1": f("3"), "J.risk.inh.i|k1": f("4"),
+        "J.risk.res.p|k1": f("3"), "J.risk.res.i|k1": f("3"),
+        "J.risk.due|m1": f("2020-01-01"), "J.risk.status|m1": f("IN_PROGRESS"),
+      },
+    });
+
+  it("shows a readable register, labelled matrix, calculated scores and Not assessed", () => {
+    const html = render("J2", page()).replace(/<!-- -->/g, "");
+    expect(html).toContain("Risk register");
+    expect(html).toContain("R1");
+    expect(html).toContain("Unauthorised access");
+    expect(html).toContain("12");
+    expect(html).toContain("Not set"); // optional target
+    expect(html).toContain("matrix (impact × probability)");
+    expect(html).toContain("Probability 4");
+    expect(html).toContain("Impact 4");
+  });
+  it("flags HIGH current residual risk with the consultation prompt and shows overdue measures", () => {
+    const html = render("J2", page()).replace(/<!-- -->/g, "");
+    expect(html).toContain("Current residual risk is HIGH");
+    expect(html).toContain("Overdue");
+    expect(html).toContain("do not change any score or decision");
+  });
+  it("offers example risks as starting points that must be adapted and confirmed", () => {
+    const html = render("J2", pageStub());
+    expect(html).toContain("Start from an example risk");
+    expect(html).toContain("You must adapt it to your processing");
+    expect(html).toContain("without scores");
+  });
+  it("shows the consultation prompt in the supervisory authority section only for current residual HIGH", () => {
+    expect(render("K3", page()).replace(/<!-- -->/g, "")).toContain("For the DPO and owner to consider");
+    expect(render("K3", pageStub())).toContain("A high inherent score alone does not trigger this question");
   });
 });

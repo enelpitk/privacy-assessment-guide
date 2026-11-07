@@ -121,6 +121,10 @@ export type InfoBlock =
   | "versionHistory"
   | "provenance"
   | "screeningOutcomes"
+  | "suggestion"
+  | "q5table"
+  | "riskSummary"
+  | "consultFlag"
   | "pending";
 
 export interface InfoDef {
@@ -134,6 +138,8 @@ export interface InfoDef {
   added?: boolean;
   /** For block "pending": the stage that will deliver this function. */
   pendingStage?: number;
+  /** For block "suggestion": the screening question ("q1" ... "q7"). */
+  ref?: string;
 }
 
 export type Item = FieldDef | CollectionDef | InfoDef;

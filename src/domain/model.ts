@@ -101,6 +101,8 @@ export interface Gap {
   recordId: string;
   label: string;
   status: Exclude<FieldStatus, "COMPLETE" | "NOT_APPLICABLE">;
+  /** The user's own comment or question for the reviewer, if any. */
+  note?: string | null;
 }
 
 export interface SubsectionResult {
@@ -130,7 +132,13 @@ function walk(
         if (ctx.get(item.id, recordId)?.value === true) {
           out.required++;
           out.unresolved++;
-          out.gaps.push({ fieldId: item.id, recordId, label: "Help requested for this section", status: "UNRESOLVED_NOT_SURE" });
+          out.gaps.push({
+            fieldId: item.id,
+            recordId,
+            label: "Help requested for this section",
+            status: "UNRESOLVED_NOT_SURE",
+            note: ctx.get(item.id, recordId)?.rationale ?? null,
+          });
         }
         continue;
       }
@@ -140,7 +148,7 @@ function walk(
       if (st === "COMPLETE" || st === "NOT_APPLICABLE") out.complete++;
       else {
         if (st === "UNRESOLVED_NOT_SURE" || st === "UNRESOLVED_LATER") out.unresolved++;
-        out.gaps.push({ fieldId: item.id, recordId, label: item.label, status: st });
+        out.gaps.push({ fieldId: item.id, recordId, label: item.label, status: st, note: ctx.get(item.id, recordId)?.rationale ?? null });
       }
     } else {
       const col: CollectionDef = item;

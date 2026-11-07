@@ -254,3 +254,17 @@ describe("server save: validation and records", () => {
     expect(sub.parentId).toBe(proc.id);
   });
 });
+
+describe("server save: screening suggestion records", () => {
+  it("stores the preserved suggestion within the same subsection permissions as the answer", async () => {
+    h.s.assignments[0].subsectionIds = ["C1"];
+    const ok = await saveChanges(contrib, "a1", [
+      change({ fieldId: "C.q1", value: "NO" }),
+      change({ fieldId: "C.q1.suggested", value: JSON.stringify({ rules: "rules-1.0.0", suggested: "YES", confirmed: "NO" }) }),
+    ]);
+    expect(ok.map((x) => x.status)).toEqual(["saved", "saved"]);
+    const other = await saveChanges(contrib, "a1", [change({ fieldId: "C.q3.suggested", value: "{}" })]);
+    expect(other[0].status).toBe("rejected"); // C3 is not assigned
+  });
+});
+

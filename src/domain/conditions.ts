@@ -27,6 +27,7 @@ export type Cond =
       includes?: unknown;
       includesOtherThan?: unknown;
       stateIn?: AnswerState[];
+      nonEmpty?: boolean;
     }
   | { yesOrUnsure: string; scope?: Scope }
   | { hasRecords: string }
@@ -77,6 +78,10 @@ function one(
     if (!Array.isArray(v) || !v.some((x) => x !== c.includesOtherThan)) {
       return false;
     }
+  }
+  if (c.nonEmpty !== undefined) {
+    const has = v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0);
+    if (has !== c.nonEmpty) return false;
   }
   if (c.stateIn !== undefined) {
     const s: AnswerState = r?.state ?? "UNANSWERED";
