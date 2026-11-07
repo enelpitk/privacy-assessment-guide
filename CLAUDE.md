@@ -9,6 +9,7 @@
 - `docs/source-inventory.md` – source-to-application inventory with stable field IDs (authoritative mapping).
 - `docs/architecture.md` – layering, data model, server-side permission matrix, workflow transitions, change classes, concurrency, test plan.
 - `docs/template-rules.md` – versioned template rules (screening thresholds, compound conditions, conditional activation, risk, workflow).
+- `docs/source-coverage-review.md` – manual review of the inventory against the source document, with limits (distinct from the automated Stage 2 inventory check).
 - `docs/content-decisions.md` – source ambiguities, wording adaptations and agreed interview decisions, for document-owner review.
 If an implementation choice conflicts with these, update the document deliberately; do not drift silently.
 

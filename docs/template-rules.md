@@ -73,7 +73,7 @@ Hidden answers are kept, marked inactive, and excluded from completeness and act
 | `COND-LIA` | Legitimate interests selected | `E.purpose.lia` |
 | `COND-SECONDARY` | E3 applicability = Yes | E3 fields |
 | `COND-AI` | F.applies = Yes | F2–F4 |
-| `COND-AUTODEC` | F.profiling = Yes (profiling or significant automated decisions), or Not sure (unresolved flag) | H.r.automated active (otherwise "not applicable", rationale for N/A) |
+| `COND-AUTODEC` (provisional) | The source condition ("Required if Section 1.6 is completed") refers to a section that does not exist (CD-01, unresolved). Provisional navigation only: the row is highlighted as likely relevant when F.profiling is Yes or Not sure | The row is always shown with the source wording. "Not applicable" needs a rationale. Not a confirmed source correction |
 | `COND-CONSENT` | Any purpose has basis (a) consent | H.r.withdraw active (otherwise "not applicable") |
 | `COND-INTL` | Q7 YES, or E7 recipient located outside EU/EEA, or user-flagged | TIA follow-up shown; international transfer fields |
 | `COND-FULL` | Screening decision PROCEED_FULL, or DPO requires full | Stages D–K active |
@@ -95,7 +95,7 @@ The full assessment (D–K) stays accessible to the DPO even when screening indi
 | `RISK-RESIDUAL` | Current residual = residual probability × residual impact. Reflects implemented measures only; planned measures do not lower it |
 | `RISK-TARGET` | Optional target risk after planned measures; shown separately from current residual |
 | `RISK-HIGH-RES` | Current residual HIGH requires documented additional actions and specialist review (DPO notified) |
-| `RISK-CONSULT` | Supervisory authority consultation considered when **current residual** risk remains HIGH after mitigation and cannot be reduced further; flagged for DPO and owner. Not triggered by inherent score alone and not a categorical conclusion (CD-02) |
+| `RISK-CONSULT` | Implements source statement B (`K.sa.guidance`) only: a prompt for DPO and owner when **current residual** risk remains HIGH after implemented measures and cannot be reduced further. Source statement A (HIGH legend, `J.cat.high.consult`) is displayed as template text and does not drive the flag. A score alone is not a legal determination; the flag concludes nothing (CD-02) |
 | `RISK-OVERDUE` | Open measure/action past due date shows "Overdue" and the date, creates one notification per item and due date, and changes no score or decision |
 | `RISK-MATRIX` | 4×4 labelled matrix, text label plus colour, listing risks in each cell |
 

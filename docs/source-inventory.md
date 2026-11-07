@@ -21,7 +21,18 @@ Source document: `DPIA_Template.docx` (kept locally, git-ignored, never publishe
 | D | Human decision or review entry (DPO / owner) | Review/decision records |
 | P | Template provenance | Template metadata, separate from assessment version history |
 
-**Export rule (applies to every row).** Every Q/T/C/D row exports in the report under its subsection heading and in JSON at `responses["<ID>"]` (repeatable records under `records.<collection>[i].<field>`). Every row also exports its state: Answered / Unanswered / Not applicable / Not sure / Complete later, plus rationale where one is held. R rows appear in the report as "Rule applied" lines with the rule ID and template version. X and E rows are excluded from reports. Rows with a different export are noted in the Notes column.
+**Export rule (applies to every row).** Reports and JSON are generated for one **selected assessment version** (or its snapshot), never a mix of current answers and an earlier opinion or decision.
+
+- **Included for Q/T/C/D rows that are active (applicable) in that version:** the answer, its state (Answered / Unanswered / Not applicable / Not sure / Complete later) and any rationale. Report location: under the subsection heading. JSON location: `responses["<ID>"]` (repeatable records under `records.<collection>[i].<field>`).
+- **Inactive (hidden by conditions) answers:** preserved internally and restored if the condition becomes true again. They are **excluded** from active completeness, the active report and active JSON findings. They may appear only in a clearly separate, optional "inactive answers" JSON section (`inactive`), never as active findings.
+- **R rows:** shown in the report as "Rule applied" lines with rule ID, rules version and the answers that produced each outcome.
+- **X and E rows:** long guidance, explanations and examples are **excluded from reports**. They remain in the application as help. JSON carries field IDs, not help text.
+- **Review comments:** excluded by default; included only when "Include review comments" is selected. **Formal DPO opinions, screening decisions and owner decision rationales are always included.**
+- **Unfinished versions:** marked "DRAFT". Unanswered and not-applicable items are labelled, never silently dropped.
+- **Progress records** created after the selected snapshot are shown separately with timestamps; they never rewrite the snapshot.
+- Rows with a different export are noted in the Notes column.
+
+**Answer convention.** For a question row (for example `C.q1`, `I.nec.q1`), the row ID holds the Yes/No (plus Not sure) value; the `.rationale` / `.just` row holds the text. Per-row sub-IDs for table rows that bundle several source cells follow the pattern `<ID>.statement` (source principle/right wording), `<ID>.keyQuestion`, `<ID>.example`, `<ID>.measures`, `<ID>.status`.
 
 **Standard companion fields.** Every Q and T row has a hidden-by-default companion for answer state, rationale (where "Not applicable"/"Not sure" needs one), last editor and edit time, per-field revision.
 
@@ -170,15 +181,17 @@ Subsection IDs are stable and are the unit of assignment and navigation.
 | E.intro.perPurpose | Complete the table for each processing purpose | R | E1 | Repeatable purposes |
 | E.purposes[] | Purpose rows (1.1 Description of the processing) | repeatable | E1 | |
 | E.purpose.purpose | Purpose: what it achieves, why needed, what if not carried out, benefits for organisation and individuals | T | E1 | Split into sub-inputs: aim, necessity, consequence if not done, benefits (original retained as reference) |
-| E.purpose.subjects | Data subject category | T | E1 | Selectable options + custom |
-| E.purpose.categories | Personal data category (specific data; avoid broad terms like "contact details") | T | E1 | Shared DataCategory entity; vagueness hint |
+| E.purpose.subjects | Data subject category: identify whose personal data is processed | T | E1 | Selectable options + custom |
+| E.purpose.subjects.example | Examples: customers, employees, job applicants or other individuals | E | E1 | Seed list of selectable options, not prefilled answers |
+| E.purpose.categories | Personal data category: list the specific data collected or used; avoid broad terms such as "contact details" | T | E1 | Shared DataCategory entity; vagueness hint |
+| E.purpose.categories.example | Examples: name, email address, phone number, date of birth | E | E1 | Seed list of selectable options, not prefilled answers |
 | E.purpose.basis | Lawful basis, Art 6(1) GDPR | T | E1 | Choices below |
-| E.purpose.basis.a | (a) Consent | C | E1 | |
-| E.purpose.basis.b | (b) Contract (incl. pre-contractual steps at request) | C | E1 | |
-| E.purpose.basis.c | (c) Legal obligation | C | E1 | |
-| E.purpose.basis.d | (d) Vital interests | C | E1 | |
-| E.purpose.basis.e | (e) Public task | C | E1 | |
-| E.purpose.basis.f | (f) Legitimate interests | C | E1 | |
+| E.purpose.basis.a | (a) Consent: data subject has given consent for one or more specific purposes | C | E1 | Option label and full source meaning both shown |
+| E.purpose.basis.b | (b) Contract: processing is necessary for the performance of a contract with the data subject, or to take pre-contractual steps at their request | C | E1 | |
+| E.purpose.basis.c | (c) Legal obligation: processing is necessary to comply with a legal obligation of the controller | C | E1 | |
+| E.purpose.basis.d | (d) Vital interests: processing is necessary to protect the vital interests of the data subject or another person | C | E1 | |
+| E.purpose.basis.e | (e) Public task: processing is necessary for the performance of a task carried out in the public interest | C | E1 | |
+| E.purpose.basis.f | (f) Legitimate interests: processing is necessary for the legitimate interests of the controller or a third party, unless overridden by the data subject's rights | C | E1 | |
 | E.purpose.justification | Justification: why basis applies; cite relevant law and section, assessment or contract; for LI reference the LIA; for contract specify type | T | E1 | Source example cites an Estonian "AML Act": preserved only in this inventory and CD-05 |
 | E.purpose.lia | Reference to legitimate interest assessment | T | E1 | Optional text/link, conditional on basis (f) |
 | E.purpose.art6Ref | "Refer to Article 6(1) GDPR for full text" | X | E1 help | |
@@ -192,16 +205,17 @@ Subsection IDs are stable and are the unit of assignment and navigation.
 | E.sc.cat.sexlife | Data concerning sex life or sexual orientation | C | E2 | |
 | E.sc.cat.criminal | Data relating to criminal convictions and offences | C | E2 | Listed with special categories in source; authorisation kept separate from Art 9 (CD-08) |
 | E.sc.cond | Conditions for processing special category data, Art 9(2) | T | E2 | Choices below |
-| E.sc.cond.a | (a) Explicit consent | C | E2 | |
-| E.sc.cond.b | (b) Employment and social security law | C | E2 | |
-| E.sc.cond.c | (c) Vital interests (data subject cannot consent) | C | E2 | |
-| E.sc.cond.d | (d) Legitimate activities (not-for-profit body, members/regular contacts) | C | E2 | |
-| E.sc.cond.e | (e) Manifestly public data | C | E2 | |
-| E.sc.cond.f | (f) Legal claims | C | E2 | |
-| E.sc.cond.g | (g) Substantial public interest (Union/Member State law, safeguards) | C | E2 | |
-| E.sc.cond.h | (h) Health and social care | C | E2 | |
-| E.sc.cond.i | (i) Public health | C | E2 | |
-| E.sc.cond.j | (j) Archiving, research or statistics | C | E2 | |
+| E.sc.cond.a | (a) Explicit consent: data subject has given explicit consent for one or more specified purposes | C | E2 | Option label and full source meaning both shown |
+| E.sc.cond.b | (b) Employment and social security law: processing is necessary under EU or Member State law in the employment context | C | E2 | |
+| E.sc.cond.c | (c) Vital interests: processing is necessary to protect vital interests where the data subject cannot consent | C | E2 | |
+| E.sc.cond.d | (d) Legitimate activities: processing by a not-for-profit body relating to its members or regular contacts | C | E2 | |
+| E.sc.cond.e | (e) Manifestly public data: data subject has manifestly made the data public | C | E2 | |
+| E.sc.cond.f | (f) Legal claims: processing is necessary for establishing, exercising or defending legal claims | C | E2 | |
+| E.sc.cond.g | (g) Substantial public interest: based on Union or Member State law with proportionate safeguards | C | E2 | |
+| E.sc.cond.h | (h) Health and social care: processing by health professionals under professional secrecy obligations | C | E2 | |
+| E.sc.cond.i | (i) Public health: processing necessary for public health reasons under EU or Member State law | C | E2 | |
+| E.sc.cond.j | (j) Archiving, research or statistics: processing necessary for archiving, scientific/historical research or statistical purposes | C | E2 | |
+| E.sc.art9Ref | "For the full legal text, refer to Article 9(2) GDPR" | X | E2 help | EU-level article reference kept in the interface |
 | E.sc.justification | Justification | T | E2 | |
 | E.sc.criminalAuth | (derived) separate authorisation explanation for criminal conviction/offence data | Q | E2 | Added field; separate from Art 9 condition (spec; CD-08) |
 | E.sc.addRow | [Add row if multiple special category data types] | R | E2 | Repeatable |
@@ -300,7 +314,7 @@ Subsection IDs are stable and are the unit of assignment and navigation.
 | H.r.rectErasure | Right to rectification and erasure | Q + T | H5 | |
 | H.r.objectRestrict | Right to object and restriction | Q + T | H5 | |
 | H.r.automated | Right not to be subject to automated decision-making | Q + T | H5 | Conditional (rule `COND-AUTODEC`); status adds "not applicable" |
-| H.r.automated.condNote | "Required if Section 1.6 is completed" | R | H5 | Reference to non-existent section; interpreted as AI/profiling section F; CD-01 |
+| H.r.automated.condNote | "Required if Section 1.6 is completed" | R | H5 | **Unresolved source reference**: the template has no Section 1.6. The source text is displayed verbatim. AI processing / profiling (F) is only a provisional navigation interpretation, not a confirmed correction; CD-01 |
 | H.r.withdraw | Right to withdraw consent | Q + T | H5 | Conditional on basis (a) anywhere (rule `COND-CONSENT`); status adds "not applicable" |
 | H.r.withdraw.condNote | "Only if lawful basis is consent" | R | H5 | |
 | H.status.na | Status option: not applicable | C | H5 | Only for the two conditional rows (source) |
@@ -337,11 +351,15 @@ Subsection IDs are stable and are the unit of assignment and navigation.
 | J.matrix | Risk matrix impact (rows) vs probability (columns), 16 cells with scores and categories | R | J1 | Computed, labelled 4×4 |
 | J.cat.low | LOW 1–4: Acceptable, monitor and review periodically; no immediate action; schedule periodic review | R | J1 | |
 | J.cat.medium | MEDIUM 5–8: Mitigate and document decisions; record rationale | R | J1 | |
-| J.cat.high | HIGH 9–16: mitigation mandatory; prior consultation with supervisory authority required; may need suspension | R | J1 | Source applies consultation to inherent HIGH, conflicting with K3; see CD-02 |
+| J.cat.high.mitigation | HIGH (9–16): "Implementation of mitigation measures is mandatory." | R | J1 | Implemented for inherent and residual HIGH: additional actions required |
+| J.cat.high.consult | HIGH (9–16): "Prior consultation with the supervisory authority (named authority) is required." | R | J1 legend | **Source statement A (score-based).** Displayed verbatim as template text with the authority name replaced by "supervisory authority". Not used to compute a consultation flag from an inherent score. See CD-02 |
+| J.cat.high.suspend | HIGH (9–16): "Where risks cannot be sufficiently mitigated, processing may need to be suspended or abandoned." | R | J1 legend | Displayed as template text |
 | J.risk[] | Risk register rows | repeatable | J2 | |
 | J.risk.name | Risk name | T | J2 | |
 | J.risk.description | Risk description: what could happen, who affected, what harm | T | J2 | Split: what could go wrong, who could be affected, what harm |
-| J.risk.example | Three example risks: processing without legal basis; unauthorised access by third party; third-party processor risk (with sample scores and measures) | E | J2 "Choose a risk example" | Must be adapted and confirmed; never counted as a real risk |
+| J.risk.ex1 | Example 1: "Processing without legal basis": data subjects have no knowledge their data is used, no ability to consent, object or exercise rights. Inherent 3×2=6 MEDIUM; measures: disclaimer on personal data processing, link to privacy policy; residual 2×2=4 LOW; additional measures n/a | E | J2 "Choose a risk example" | Must be adapted and confirmed; never counted as a real risk |
+| J.risk.ex2 | Example 2: "Unauthorised access by third party": data leaked or stolen via cyberattack; data subject could become target of fraud. Inherent 3×4=12 HIGH; measures: encryption at rest and in transit, DLP tools; residual 2×4=8 MEDIUM; additional measures described | E | J2 | Same |
+| J.risk.ex3 | Example 3: "Third-Party Processor Risk": processor fails to provide adequate security or compliance guarantees. Inherent 4×4=16 HIGH; residual 3×4=12 HIGH; additional measures described | E | J2 | Same. Residual HIGH illustrates the additional-actions requirement |
 | J.risk.inh.p | Inherent probability | T | J2 | 1–4 |
 | J.risk.inh.i | Inherent impact | T | J2 | 1–4 |
 | J.risk.inh.score | Inherent risk (P×I and category) | T | J2 | Computed server-side |
@@ -367,7 +385,7 @@ Subsection IDs are stable and are the unit of assignment and navigation.
 | K.dpo.category | (added) No objections / Recommendations-conditions / Objections remain | D | K1 | Workflow label |
 | K.dpo.blocking | (added) blocking issues with reason | D | K1 | |
 | K.views | Views of data subjects or representatives: how obtained and feedback; or why not sought | Q | K2 | Structured: sought yes/no/not applicable + description or rationale |
-| K.sa.guidance | Consultation with supervisory authority: required if residual risks remain HIGH after mitigation and cannot be reduced further | R | K3 | Consultation logic tied to current residual HIGH, never inherent; see CD-02 |
+| K.sa.guidance | Consultation with the supervisory authority (named authority): "Required if residual risks remain HIGH after mitigation measures are applied and cannot be reduced further." | R | K3 | **Source statement B (residual-based).** Used for the computed consultation flag (current residual HIGH, unresolved). Never from an inherent score; see CD-02 |
 | K.sa.consulted | Has authority been consulted; reason and response/recommendations | Q | K3 | Authority name optional (see CD-05) |
 | K.decision | Final decision | D | K4 | |
 | K.decision.approved | APPROVED: may proceed, residual risks acceptable | D | K4 | |
