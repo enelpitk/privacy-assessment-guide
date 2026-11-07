@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { STAGES, subsectionById } from "@/content";
 import { buildModel, evaluateAssessment, evaluateSubsection, stageProgress } from "@/domain/model";
 import { LIFECYCLE_LABEL, SCREENING_LABEL } from "@/lib/labels";
@@ -66,11 +66,13 @@ export function Shell({ page, current, children }: { page: PageData; current: st
     }).catch(() => undefined);
   }, [current, page.assessment.id]);
 
+  const panel = useNavPanel();
   return (
     <StoreCtx.Provider value={{ store, page, navigate }}>
       <AssessmentHeader />
-      <div className="mx-auto grid max-w-[88rem] gap-6 px-4 py-5 lg:grid-cols-[17rem_minmax(0,1fr)]">
-        <SideNav current={current} />
+      <NavToggle open={panel.open} toggle={panel.toggle} />
+      <div className={`mx-auto grid max-w-[88rem] gap-6 px-4 py-5 ${panel.columns}`}>
+        <SideNav current={current} visibility={panel.visibility} />
         <main id="main" className="min-w-0">
           <Flash />
           {children}
@@ -166,7 +168,7 @@ function AssessmentHeader() {
   );
 }
 
-function SideNav({ current }: { current: string | null }) {
+function SideNav({ current, visibility }: { current: string | null; visibility: string }) {
   const { page, navigate } = useStoreCtx();
   const model = useModel();
   const result = evaluateAssessment(model);
@@ -235,13 +237,69 @@ function SideNav({ current }: { current: string | null }) {
       </ol>
     </nav>
   );
+  // Always mounted; visibility is controlled by the wrapper so toggling never loses state.
   return (
-    <div>
-      <div className="hidden lg:block">{content}</div>
-      <details className="rounded-md border border-slate-200 bg-white p-3 lg:hidden">
-        <summary className="cursor-pointer font-medium text-brand-700">Sections and progress</summary>
-        <div className="mt-2">{content}</div>
-      </details>
+    <div id="assessment-nav" className={`${visibility} rounded-md border border-slate-200 bg-white p-3 lg:border-0 lg:bg-transparent lg:p-0`}>
+      {content}
+    </div>
+  );
+}
+
+// ---- navigation panel preference (a UI preference only, never assessment data)
+const NAV_PREF_KEY = "dpia-nav-pref";
+type NavPref = "open" | "closed" | null;
+
+const subscribeDesktop = (fn: () => void) => {
+  const mq = window.matchMedia("(min-width: 1024px)");
+  mq.addEventListener("change", fn);
+  return () => mq.removeEventListener("change", fn);
+};
+
+function useNavPanel() {
+  const [pref, setPref] = useState<NavPref>(null);
+  // Server snapshot assumes desktop; CSS defaults (below) cover the first paint on both sizes.
+  const isDesktop = useSyncExternalStore(
+    subscribeDesktop,
+    () => window.matchMedia("(min-width: 1024px)").matches,
+    () => true,
+  );
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem(NAV_PREF_KEY);
+      if (v === "open" || v === "closed") setPref(v);
+    } catch {
+      /* preference unavailable: use the defaults */
+    }
+  }, []);
+  const open = pref ? pref === "open" : isDesktop;
+  const toggle = () => {
+    const next: NavPref = open ? "closed" : "open";
+    setPref(next);
+    try {
+      localStorage.setItem(NAV_PREF_KEY, next ?? "");
+    } catch {
+      /* ignore */
+    }
+  };
+  // Until a choice is made: shown on desktop, hidden on mobile (pure CSS, no flash).
+  const visibility = pref === "open" ? "block" : pref === "closed" ? "hidden" : "hidden lg:block";
+  const columns = pref === "closed" ? "" : "lg:grid-cols-[17rem_minmax(0,1fr)]";
+  return { open, toggle, visibility, columns };
+}
+
+export function NavToggle({ open, toggle }: { open: boolean; toggle: () => void }) {
+  return (
+    <div className="mx-auto max-w-[88rem] px-4 pt-3">
+      <button
+        type="button"
+        className="btn-secondary"
+        aria-expanded={open}
+        aria-controls="assessment-nav"
+        onClick={toggle}
+        suppressHydrationWarning
+      >
+        {open ? "Hide navigation" : "Show navigation"}
+      </button>
     </div>
   );
 }

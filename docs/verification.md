@@ -2,7 +2,16 @@
 
 Legend: **Implemented** = code exists. **Local** = verified by automated checks that were actually run on a developer machine, without a database or server. **Railway** = verified on the deployed app. **Not verified** = no evidence yet.
 
-Last updated: end of Stage 2. Nothing has been verified on Railway.
+Last updated: after the navigation-panel change. Railway results below are **limited manual checks reported by the project owner**, not full acceptance.
+
+## Limited manual verification on Railway (reported by the project owner)
+
+| Check | Result | Scope |
+|---|---|---|
+| `/api/health` | `{"app":"ok","database":"ok"}` | Confirms the app runs and the database is reachable and migrated. Not application acceptance. |
+| Create an assessment, save a form answer, reload the page | The saved answer was still present | One owner session. Cross-device/second-session access, other roles, conflicts, repeatable records and the register filters were **not** checked. |
+
+Everything in the table below is still unverified on Railway unless stated here.
 
 | Area | Implemented | Local (ran) | Railway | Notes |
 |---|---|---|---|---|
@@ -22,7 +31,8 @@ Last updated: end of Stage 2. Nothing has been verified on Railway.
 | Shared entities (create, rename, guarded delete) | Yes | Permission tests only | Not verified | Rename/delete queries untested against a DB |
 | Resume last location, navigation guard, unsaved-change warning | Yes | Store tests (flush behaviour) | Not verified | `beforeunload` and navigation prompts untested in a browser |
 | Responsive layout, keyboard and screen-reader behaviour | Partly | Not tested | Not verified | Written with labels, fieldsets, focus styles; no audit done |
-| Health endpoint `/api/health` | Yes | Built | Not verified | |
+| Health endpoint `/api/health` | Yes | Built | Limited manual check: ok/ok | See the manual verification table |
+| Collapsible navigation panel (preference kept in the browser, not assessment data) | Yes | Toggle label/ARIA test; build | Not verified | Default open on desktop, collapsed on mobile; not seen in a browser by me |
 
 ## Not built yet (clearly shown as pending in the UI)
 
