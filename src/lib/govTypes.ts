@@ -29,6 +29,9 @@ export interface ScreeningDecisionView {
   advice: string | null;
   indicatedFull: boolean;
   superseded: boolean;
+  /** The version this record was made for, and whether that is the version currently shown. */
+  versionNumber: string;
+  currentVersion: boolean;
   createdAt: string;
 }
 
@@ -43,6 +46,9 @@ export interface OpinionView {
   superseded: boolean;
   /** A short screening opinion from an earlier screening cycle (the screening was reopened). Historical only. */
   earlierScreeningCycle: boolean;
+  /** The version this record was made for, and whether that is the version currently shown. */
+  versionNumber: string;
+  currentVersion: boolean;
   createdAt: string;
 }
 
@@ -80,6 +86,9 @@ export interface OwnerDecisionView {
   departureRationale: string | null;
   supersedesId: string | null;
   reviewedSnapshotId: string;
+  /** The version this record was made for, and whether that is the version currently shown. */
+  versionNumber: string;
+  currentVersion: boolean;
   createdAt: string;
 }
 

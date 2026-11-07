@@ -472,6 +472,21 @@ describe("CD-34: an earlier short opinion stays historical after the screening i
     expect(JSON.stringify(table("dpoOpinion").slice(0, 1))).toBe(JSON.stringify(JSON.parse(before)));
   });
 
+  it("after a new revision, earlier versions' decisions, opinions and owner decisions are labelled with their version and not as current, and the stored rows are unchanged", async () => {
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    await act(dpo1, { action: "recordScreeningDecision", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "No indication", opinionCategory: "NO_OBJECTIONS", opinionText: "No objections." });
+    await act(owner, { action: "ownerDecision", decision: "APPROVED", rationale: "Approved" });
+    const before = JSON.stringify([table("screeningDecision"), table("dpoOpinion"), table("ownerDecision"), table("snapshot")]);
+    let g = await loadGovernance(owner, id);
+    expect([g.screeningDecisions[0].currentVersion, g.opinions[0].currentVersion, g.ownerDecisions[0].currentVersion]).toEqual([true, true, true]);
+    await act(owner, { action: "startRevision", reason: "Review", changeDescription: "x", categories: ["other"] });
+    g = await loadGovernance(owner, id);
+    for (const r of [g.screeningDecisions[0], g.opinions[0], g.ownerDecisions[0]]) expect(r).toMatchObject({ versionNumber: "1.0", currentVersion: false });
+    expect(g.versions.find((v) => v.current)?.versionNumber).toBe("2.0");
+    expect(JSON.stringify([table("screeningDecision"), table("dpoOpinion"), table("ownerDecision"), table("snapshot")])).toBe(before);
+  });
+
   it("the version data marks a rejected finalised version as rejected, and an approved one not", async () => {
     completeAll();
     await act(owner, { action: "submitScreening" });

@@ -217,8 +217,10 @@ function ScreeningCard({ gov }: { gov: GovernanceData }) {
       {roles.owner && s.screeningStatus === "AWAITING_DPO" ? (
         <>
           <p>
-            <span className="chip-warn">Full DPIA indicated — awaiting DPO review</span>
-            {gov.screening?.fullDpiaIndicated ? null : <span className="help-text ml-2">(Awaiting the DPO’s screening decision.)</span>}
+            <span className="chip-warn">
+              {gov.screening?.fullDpiaIndicated ? "Full DPIA indicated — awaiting DPO review" : gov.screening ? "No full DPIA indicated — awaiting DPO screening decision" : "Awaiting DPO screening decision"}
+            </span>
+            <span className="help-text ml-2">(The DPO records the screening decision. The indication above comes from the template rules and is not a conclusion.)</span>
           </p>
           <Do body={{ action: "withdrawScreening" }}>Withdraw for editing</Do>
         </>
@@ -284,9 +286,10 @@ function ScreeningCard({ gov }: { gov: GovernanceData }) {
           <h3 className="font-semibold">Screening decisions (history)</h3>
           <ul className="mt-1 space-y-2">
             {gov.screeningDecisions.map((d) => (
-              <li key={d.id} className={`rounded border p-2 ${d.superseded ? "border-slate-200 bg-slate-50 text-ink-soft" : "border-slate-300 bg-white"}`}>
+              <li key={d.id} className={`rounded border p-2 ${d.superseded || !d.currentVersion ? "border-slate-200 bg-slate-50 text-ink-soft" : "border-slate-300 bg-white"}`}>
                 <p>
                   <strong>{SCREENING_DECISION_LABEL[d.decision as keyof typeof SCREENING_DECISION_LABEL]}</strong> — {d.dpoName}, {formatTime(d.createdAt)}
+                  <VersionTag versionNumber={d.versionNumber} currentVersion={d.currentVersion} />
                   {d.superseded ? <span className="chip-neutral ml-2">Superseded</span> : null}
                 </p>
                 <p className="whitespace-pre-wrap">{d.rationale}</p>
@@ -330,10 +333,11 @@ function FullReviewCard({ gov }: { gov: GovernanceData }) {
       </select>
     </label>
   );
-  if (!showFull && gov.opinions.length === 0) {
+  if (!showFull && gov.opinions.filter((o) => o.currentVersion).length === 0) {
     return (
       <Card title="Gate 2: full-assessment review">
         <p>{s.path === "PRE_ONLY" ? "Not applicable: the screening ended the assessment at the pre-assessment." : "Available after the DPO decides that a full assessment should proceed."}</p>
+        <OpinionHistory gov={gov} />
       </Card>
     );
   }
@@ -442,9 +446,10 @@ function OpinionHistory({ gov }: { gov: GovernanceData }) {
       <h3 className="font-semibold">Formal DPO opinions (read-only history)</h3>
       <ul className="mt-1 space-y-2">
         {gov.opinions.map((o) => (
-          <li key={o.id} className={`rounded border p-2 ${o.superseded || o.earlierScreeningCycle ? "border-slate-200 bg-slate-50 text-ink-soft" : "border-slate-300 bg-white"}`}>
+          <li key={o.id} className={`rounded border p-2 ${o.superseded || o.earlierScreeningCycle || !o.currentVersion ? "border-slate-200 bg-slate-50 text-ink-soft" : "border-slate-300 bg-white"}`}>
             <p>
               <strong>{OPINION_LABEL[o.category]}</strong> — {o.dpoName}, {formatTime(o.createdAt)} ({o.kind === "SCREENING" ? "screening opinion" : "full review"})
+              <VersionTag versionNumber={o.versionNumber} currentVersion={o.currentVersion} />
               {o.supersedesId ? <span className="chip-neutral ml-2">Amendment</span> : null}
               {o.superseded ? <span className="chip-neutral ml-2">Superseded</span> : null}
               {o.earlierScreeningCycle ? <span className="chip-warn ml-2">Earlier screening cycle</span> : null}
@@ -488,11 +493,14 @@ function DecisionCard({ gov }: { gov: GovernanceData }) {
   return (
     <Card title="Owner decision">
       {gov.ownerDecisions.length ? (
+        <>
+          {gov.ownerDecisions.some((d) => d.currentVersion) ? null : <p>No decision recorded yet for this version. The process owner decides after the DPO review.</p>}
         <ul className="space-y-2">
           {gov.ownerDecisions.map((d) => (
-            <li key={d.id} className="rounded border border-slate-300 bg-white p-2">
+            <li key={d.id} className={`rounded border p-2 ${d.currentVersion ? "border-slate-300 bg-white" : "border-slate-200 bg-slate-50 text-ink-soft"}`}>
               <p>
                 <strong>{DECISION_LABEL[d.decision as keyof typeof DECISION_LABEL]}</strong> — {d.ownerName}, {formatTime(d.createdAt)}
+                <VersionTag versionNumber={d.versionNumber} currentVersion={d.currentVersion} />
                 {d.supersedesId ? <span className="chip-neutral ml-2">After conditions confirmed</span> : null}
               </p>
               <p className="whitespace-pre-wrap">{d.rationale}</p>
@@ -504,6 +512,7 @@ function DecisionCard({ gov }: { gov: GovernanceData }) {
             </li>
           ))}
         </ul>
+        </>
       ) : (
         <p>No decision recorded yet. The process owner decides after the DPO review. The recorded decision is a human decision, not a software certification.</p>
       )}
@@ -595,6 +604,17 @@ function DecisionCard({ gov }: { gov: GovernanceData }) {
         </div>
       ) : null}
     </Card>
+  );
+}
+
+/** Labels a stored record with the version it was made for; records of earlier versions are shown as historical. */
+function VersionTag({ versionNumber, currentVersion }: { versionNumber: string; currentVersion: boolean }) {
+  return currentVersion ? (
+    <span className="chip-neutral ml-2">Version {versionNumber} (this version)</span>
+  ) : (
+    <span className="chip-warn ml-2" data-testid="earlier-version-tag">
+      Version {versionNumber} — earlier version, historical; does not apply to this version
+    </span>
   );
 }
 
@@ -1055,10 +1075,12 @@ export function GovStatus({ kind }: { kind: "screening" | "opinion" | "decision"
   );
   if (failed) return <p className="text-sm">Could not load the review status. {link}</p>;
   if (!gov) return <p className="help-text">Loading review status…</p>;
-  const sd = [...gov.screeningDecisions].reverse().find((d) => !d.superseded);
-  const op = [...gov.opinions].reverse().find((o) => !o.superseded && !o.earlierScreeningCycle);
-  const earlier = [...gov.opinions].reverse().find((o) => !o.superseded && o.earlierScreeningCycle);
-  const od = [...gov.ownerDecisions].reverse()[0];
+  // Only records made for the version shown count as its status; earlier versions' records are historical.
+  const sd = [...gov.screeningDecisions].reverse().find((d) => !d.superseded && d.currentVersion);
+  const op = [...gov.opinions].reverse().find((o) => !o.superseded && !o.earlierScreeningCycle && o.currentVersion);
+  const earlier = [...gov.opinions].reverse().find((o) => !o.superseded && o.earlierScreeningCycle && o.currentVersion);
+  const od = [...gov.ownerDecisions].reverse().find((d) => d.currentVersion);
+  const earlierVersions = gov.screeningDecisions.some((d) => !d.currentVersion) || gov.opinions.some((o) => !o.currentVersion) || gov.ownerDecisions.some((d) => !d.currentVersion);
   return (
     <div className="max-w-prose2 space-y-1 rounded-md border border-slate-200 bg-white p-3 text-sm">
       {kind === "screening" ? (
@@ -1094,6 +1116,7 @@ export function GovStatus({ kind }: { kind: "screening" | "opinion" | "decision"
           <p>No owner decision is recorded yet.</p>
         )
       ) : null}
+      {earlierVersions ? <p className="help-text">Records made for earlier versions are historical and are not shown here. They are listed, with their version, on Review and decisions.</p> : null}
       <p>{link}</p>
     </div>
   );

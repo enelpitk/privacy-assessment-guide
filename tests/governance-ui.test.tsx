@@ -103,8 +103,8 @@ describe("review screen shows the right actions to the right role", () => {
   });
   it("shows submitted opinions as read-only history, marks superseded ones, and offers amendment only to the assigned DPO", () => {
     const ops = [
-      { id: "p1", kind: "FULL", dpoName: "Dana Whitfield", category: "NO_OBJECTIONS" as const, opinionText: "No objections.", recommendations: null, supersedesId: null, superseded: true, earlierScreeningCycle: false, createdAt: "2026-11-08T10:00:00.000Z" },
-      { id: "p2", kind: "FULL", dpoName: "Dana Whitfield", category: "OBJECTIONS_REMAIN" as const, opinionText: "Objections now remain.", recommendations: null, supersedesId: "p1", superseded: false, earlierScreeningCycle: false, createdAt: "2026-11-08T11:00:00.000Z" },
+      { id: "p1", kind: "FULL", dpoName: "Dana Whitfield", category: "NO_OBJECTIONS" as const, opinionText: "No objections.", recommendations: null, supersedesId: null, superseded: true, earlierScreeningCycle: false, versionNumber: "1.0", currentVersion: true, createdAt: "2026-11-08T10:00:00.000Z" },
+      { id: "p2", kind: "FULL", dpoName: "Dana Whitfield", category: "OBJECTIONS_REMAIN" as const, opinionText: "Objections now remain.", recommendations: null, supersedesId: "p1", superseded: false, earlierScreeningCycle: false, versionNumber: "1.0", currentVersion: true, createdAt: "2026-11-08T11:00:00.000Z" },
     ];
     const g = gov({ opinions: ops, state: { ...gov().state, lifecycle: "AWAITING_OWNER_DECISION", screeningStatus: "DECIDED", path: "FULL", latestOpinion: "OBJECTIONS_REMAIN" } });
     const ctx = { lifecycle: "AWAITING_OWNER_DECISION" as const, screeningStatus: "DECIDED" as const };
@@ -147,8 +147,8 @@ describe("review screen shows the right actions to the right role", () => {
     expect(review("owner", ok, { lifecycle: "FINALISED", screeningStatus: "DECIDED" })).not.toContain("Finalised — Rejected");
   });
   it("display: an opinion from an earlier screening cycle is labelled and explained as historical, apart from a current-cycle opinion", () => {
-    const earlier = { id: "s1", kind: "SCREENING", dpoName: "Dana Whitfield", category: "NO_OBJECTIONS" as const, opinionText: "Short opinion, first cycle.", recommendations: null, supersedesId: null, superseded: false, earlierScreeningCycle: true, createdAt: "2026-11-08T10:00:00.000Z" };
-    const current = { ...earlier, id: "s2", opinionText: "Short opinion, second cycle.", earlierScreeningCycle: false, createdAt: "2026-11-08T12:00:00.000Z" };
+    const earlier = { id: "s1", kind: "SCREENING", dpoName: "Dana Whitfield", category: "NO_OBJECTIONS" as const, opinionText: "Short opinion, first cycle.", recommendations: null, supersedesId: null, superseded: false, earlierScreeningCycle: true, versionNumber: "1.0", currentVersion: true, createdAt: "2026-11-08T10:00:00.000Z" };
+    const current = { ...earlier, id: "s2", opinionText: "Short opinion, second cycle.", earlierScreeningCycle: false, versionNumber: "1.0", currentVersion: true, createdAt: "2026-11-08T12:00:00.000Z" };
     const html = review("owner", gov({ opinions: [earlier, current] }));
     expect(html).toContain("Earlier screening cycle");
     expect(html).toContain("does not count for the current screening cycle");
@@ -157,8 +157,39 @@ describe("review screen shows the right actions to the right role", () => {
     expect(html).toContain("Short opinion, second cycle.");
     expect(review("owner", gov({ opinions: [current] }))).not.toContain("Earlier screening cycle");
   });
+  it("display: the owner's awaiting-DPO summary follows the calculated screening outcome", () => {
+    const awaiting = (full: boolean) =>
+      review("owner", gov({ screening: { fullDpiaIndicated: full, tiaIndicated: false, unresolved: [], snapshotId: "s1" }, state: { ...gov().state, screeningStatus: "AWAITING_DPO" } }), { screeningStatus: "AWAITING_DPO" });
+    const none = awaiting(false);
+    expect(none).toContain("No full DPIA indicated — awaiting DPO screening decision");
+    expect(none).not.toContain("Full DPIA indicated — awaiting DPO review");
+    const yes = awaiting(true);
+    expect(yes).toContain("Full DPIA indicated — awaiting DPO review");
+    expect(yes).not.toContain("No full DPIA indicated");
+  });
+  it("display: records of earlier versions carry their version and a historical label and never read as current", () => {
+    const base = { versionNumber: "1.0", currentVersion: false, createdAt: "2026-11-08T10:00:00.000Z" };
+    const g = gov({
+      screeningDecisions: [{ id: "sd1", dpoName: "Dana Whitfield", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "Old rationale", exceptionJustification: null, mitigationControls: null, advice: null, indicatedFull: false, superseded: false, ...base }],
+      opinions: [{ id: "op1", kind: "SCREENING", dpoName: "Dana Whitfield", category: "NO_OBJECTIONS" as const, opinionText: "Old opinion", recommendations: null, supersedesId: null, superseded: false, earlierScreeningCycle: false, ...base }],
+      ownerDecisions: [{ id: "od1", ownerName: "Alex Rowan", decision: "APPROVED", rationale: "Old approval", departsFromDpo: false, departureRationale: null, supersedesId: null, reviewedSnapshotId: "s", ...base }],
+      versions: [
+        { id: "v1", versionNumber: "1.0", kind: "FINALISED", createdAt: "2026-11-08T10:00:00.000Z", reason: null, changeDescription: null, categories: [], current: false, rejected: false },
+        { id: "v2", versionNumber: "2.0", kind: "DRAFT", createdAt: "2026-11-09T10:00:00.000Z", reason: "Review", changeDescription: "x", categories: [], current: true, rejected: false },
+      ],
+    });
+    const html = review("owner", g);
+    expect((html.match(/Version 1\.0 — earlier version, historical; does not apply to this version/g) ?? []).length).toBe(3);
+    expect(html).toContain("No decision recorded yet for this version");
+    expect(html).toContain("Available after the DPO decides that a full assessment should proceed");
+    expect(html).toContain("Old approval");
+    // the same records in the current version are labelled as belonging to it
+    const cur = review("owner", gov({ ownerDecisions: [{ id: "od2", ownerName: "Alex Rowan", decision: "APPROVED", rationale: "Current approval", departsFromDpo: false, departureRationale: null, supersedesId: null, reviewedSnapshotId: "s", versionNumber: "2.0", currentVersion: true, createdAt: "2026-11-09T11:00:00.000Z" }] }));
+    expect(cur).toContain("Version 2.0 (this version)");
+    expect(cur).not.toContain("earlier version, historical");
+  });
   it("shows a recorded departure from the DPO's opinion prominently", () => {
-    const g = gov({ ownerDecisions: [{ id: "d", ownerName: "Alex Rowan", decision: "APPROVED", rationale: "Approved.", departsFromDpo: true, departureRationale: "We accept the residual risk.", supersedesId: null, reviewedSnapshotId: "s", createdAt: "2026-11-08T12:00:00.000Z" }] });
+    const g = gov({ ownerDecisions: [{ id: "d", ownerName: "Alex Rowan", decision: "APPROVED", rationale: "Approved.", departsFromDpo: true, departureRationale: "We accept the residual risk.", supersedesId: null, reviewedSnapshotId: "s", versionNumber: "1.0", currentVersion: true, createdAt: "2026-11-08T12:00:00.000Z" }] });
     expect(review("dpo", g)).toContain("departs from the DPO’s opinion and accepts the risk");
     expect(review("dpo", g)).toContain("We accept the residual risk.");
   });

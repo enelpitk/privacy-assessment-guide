@@ -20,3 +20,16 @@ UI refinement is paused. These are ideas noted so far; none is being implemented
 - **Narrower correction of a recorded final owner decision (CD-34).** Today, correcting a recorded final owner decision, including on the pre-assessment-only path, requires "Start review / update" and a fresh screening. Candidate: a narrow owner action "Reopen the decision" (reason required) that records a new superseding owner decision against the same reviewed snapshot, without repeating screening or the DPO checkpoints, and not offered once the path has changed.
 - **Earlier short opinion shown as current (CD-34).** After "Reopen screening", the earlier screening-cycle short opinion is not marked superseded or historical. It still counts as the latest opinion in the questionnaire's 11.1 status block and in the internal `latestOpinion` state until the new cycle records its own opinion. It cannot satisfy any gate (checked locally), so this is a display and clarity gap only. Candidate: mark opinions of an invalidated screening cycle as "Earlier screening cycle" and exclude them from "latest opinion".
 - **Rejected assessments appear as "Finalised".** The register status and the version chip say "Finalised" for a rejected version. The decision itself reads "Rejected". Candidate: show "Finalised – rejected" in the register, history and header.
+
+## Display observations from Stage 4 Test 1 (not fixed)
+
+- The activity history shows internal subsection IDs for assignments ("Sections assigned to Priya Nandi: B1") instead of the visible numbers ("2.1").
+- The ownership-transfer form has "Keep me as a read-only viewer" ticked by default; consider whether the default should be unticked.
+- "Save draft" stays enabled on read-only sections for assignees and DPOs although the fields are disabled.
+- Comments are not listed in the activity history; decide whether they should be.
+- The processing-name field in 1.1 is pre-filled with the assessment name, so typing appends to it; this is easy to do by mistake.
+
+## Display observations from Stage 4 Test 2 (fixed locally 2026-11-07; not yet verified on Railway)
+
+- The Review page shows "Full DPIA indicated — awaiting DPO review" while a screening awaits the DPO even when the screening indications say no full DPIA is indicated; make the chip depend on the indication.
+- After "Start review / update", the Review page of the new draft lists the earlier version's screening decision, DPO opinion and owner decision without saying which version they belong to; label each record with its version (and consider marking earlier-version records as "Previous version").

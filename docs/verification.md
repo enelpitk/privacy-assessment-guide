@@ -63,6 +63,54 @@ Everything in the table below is still unverified on Railway unless stated here.
 | Visible numbering 1–11 / 1.1, compact typography, simplified sections 1.1, 1.2, 2.1, 2.2 (help-request control, compact grouped records, controller select) | Yes | Domain + render tests (105 tests total), type check, build | Not verified | Not seen in a browser; typography, spacing and mobile usability need a visual check |
 | Collapsible navigation panel (preference kept in the browser, not assessment data) | Yes | Toggle label/ARIA test; build | Not verified | Default open on desktop, collapsed on mobile; not seen in a browser by me |
 
+## Stage 4 verification on Railway: Test 1 (built-in browser, performed 2026-11-07, commit `f9f9384`)
+
+Deployment evidence: `/api/health` returned `{"app":"ok","database":"ok","commit":"f9f9384"}`. The owner reported the Railway deployment ACTIVE with the log "2 migrations found in prisma/migrations" and "No pending migrations to apply" (the repository has exactly two: `init` and `stage4_governance`; this log is from the latest deployment, so it shows the Stage 4 migration was already applied earlier, not when).
+
+Test assessment: "TEST Stage 4 verification (fictional)", DPIA-2026-0004, created for this test only. Scope: creation, visibility and the assignment boundary (CD-32). Nothing was submitted, so no snapshot exists; nothing was deleted, reset or reseeded. The Stage 3 test assessment and the other two test drafts were not touched.
+
+Legend: **Observed** = performed and seen in the browser, with the server involved. **UI only** = the interface prevented the attempt (disabled or hidden control), so the server's refusal was **not tested**.
+
+| # | Step | Result | Basis |
+|---|---|---|---|
+| 1 | Alex creates the assessment | Pass | Observed: register shows Draft, 1.0, screening not submitted. DPO choices were only Dana and Tomas. Server refusal of owner-as-DPO **not tested** (never offered). |
+| 2 | Alex saves answers in 1.1 | Pass | Observed: both values present after a full reload |
+| 3 | Sam cannot see or open it | Pass | Observed server behaviour: empty register and HTTP 404 on the direct URL |
+| 4 | Assignee list | Pass | Observed: only Priya and Sam; non-assignable sections not offered |
+| 5 | Alex assigns 2.1 to Priya | Pass | Observed: Pending, section 2.1, task text |
+| 6 | Priya sees it under "Assigned to me" | Pass | Observed: one assessment listed |
+| 7 | Priya edits the assigned subsection | Pass | Observed: record and text saved, present after reload |
+| 8 | Priya cannot edit unassigned 1.1 | Pass, UI only | Fields disabled; values unchanged. Server refusal **not tested** |
+| 9 | Priya sees no assign, share, transfer, submit or decide controls | Pass, UI only | Team page shows only her own Start / Mark complete; Review page has no buttons. Server refusal **not tested** |
+| 10 | Priya marks complete | Pass, UI only for the lock | Status Completed, fields disabled. Server refusal of a later edit **not tested** |
+| 11 | Alex reopens | Pass | Observed: Pending, Priya's fields enabled again (no further save made) |
+| 12 | Dana comments | Pass; edit denial UI only | Comment posted and labelled "DPO review comment". Dana's fields disabled; server refusal **not tested** |
+| 13 | History | Pass | Observed: created, sections assigned, assignment completed, assignment reopened. Comments are not in the activity history (not decided whether they should be). |
+
+Not verified by Test 1: server-side refusals for every denied case above; submission, snapshots and the immutability triggers; the DPO review cycle; owner decisions; ownership transfer; new revisions; deletion; answer-by-answer preservation of the Stage 3 test assessment (the earlier "20 of 133 answers" was an observation, not a baseline).
+
+Note on method: the browser blocks native confirmation dialogs; the "Mark complete" and "Reopen" confirmations were accepted by script for the approved steps only.
+
+## Stage 4 verification on Railway: Test 2 (built-in browser, performed 2026-11-07, commit `f9f9384`)
+
+Scope: pre-assessment-only path end to end on "TEST Stage 4 verification (fictional)" (DPIA-2026-0004), then a new revision. The fictional scenario was a staff-training attendance register (about 300 employees, no special category data, EU only); every screening answer was entered as an honest "No" with a rationale, nothing was marked "Not sure" to bypass validation. Controller: Harbour Bank. The assessment is **retained** (now submitted, so archive-only); other assessments were not touched; no reset or reseed.
+
+| # | Step | Result | Basis |
+|---|---|---|---|
+| 1 | Alex submits the screening | Pass | Observed: status "Screening awaiting DPO review"; indications "no full DPIA indication; no TIA follow-up indicated"; a screening snapshot (fingerprint `34fd5b041d10`) appeared in History. **Not observed:** that sections 1 to 3 became read-only, and Priya's assignment locking. |
+| 2 | Dana records "Pre-assessment sufficient" with the short opinion in one action | Pass | Observed: "Screening decided", "Path: Pre-assessment only", "DPO review complete — awaiting owner decision". **Not observed section by section:** the page states the full-assessment sections are not applicable; I did not open each one. |
+| 3 | Alex records "Approved" | Pass | Observed: "Finalised" (plain, not "— Rejected"); a finalised snapshot (fingerprint `df0dc7bb9da9`); no departure acknowledgement needed. |
+| 4 | Baseline of both snapshots | Recorded | Fingerprints as above; page-content hashes (SHA-256, first 16 hex characters, taken from the rendered snapshot page text without the "Saved … by" line): screening `7d9a9897c5138c61` (11 160 characters), finalised `716f923f34c14607` (5 477 characters). Opinion and owner decision text were also read. |
+| 5 | Alex "Start review / update" | Pass | Observed: version 2.0 "Current Draft", reason and description recorded, category "periodic_review"; 45 sections marked "Carried forward — please review"; screening "not submitted"; answers copied (1.1 text and the Q5 sub-question results present in 2.0). |
+| 6 | Compare version 1.0 after the revision | Pass (observed preservation) | After revision 2.0 existed, both snapshot pages for 1.0 showed the same fingerprints and the same page-content hashes as the baseline; version 1.0 still shows "Finalised"; the snapshot pages show "Owner recorded when this snapshot was taken: Alex Rowan. Current owner of the assessment: Alex Rowan." |
+
+What this does and does not show: it shows **observed preservation** in the browser (the displayed fingerprints and page content of the earlier version's snapshots did not change, and no approval, opinion or screening decision was carried into 2.0's workflow state). It is **not proof of database-level immutability**: the interface offers no way to alter a snapshot, opinion or decision, so the database triggers were not exercised. Server-side refusals of denied actions remain untested.
+
+Observations (both since corrected in code and covered by local tests, **not yet re-checked on Railway**; see the backlog):
+- While the screening awaited the DPO, the Review page showed "Full DPIA indicated — awaiting DPO review" although the same page said no full DPIA was indicated. The chip text appears unconditional.
+- On the version 2.0 Review page the earlier version's screening decision, DPO opinion and "Approved" owner decision are listed under the draft revision without a version label. The status above them says Draft / Screening not submitted, but a reader could take "Approved" as applying to 2.0.
+- The Stage 3 test assessment was not touched.
+
 ## Stage 4 items that specifically need Railway verification
 
 - Migration `20261108000000_stage4_governance` applies cleanly at startup on the existing database and keeps all existing assessments and answers (the test assessment included).

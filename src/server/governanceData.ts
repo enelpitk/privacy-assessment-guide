@@ -155,6 +155,7 @@ export async function loadGovernance(user: CurrentUser, assessmentId: string): P
     overdue: Boolean(x.deadline && x.status !== "COMPLETED" && x.status !== "CANCELLED" && day(x.deadline)! < todayIso),
   }));
 
+  const ver = (versionId: string) => ({ versionNumber: versions.find((v) => v.id === versionId)?.versionNumber ?? "", currentVersion: versionId === vid });
   const sharedIds = new Set(access.map((x) => x.userId));
   const state = await stateOf(prisma, a);
 
@@ -176,11 +177,11 @@ export async function loadGovernance(user: CurrentUser, assessmentId: string): P
     },
     screeningDecisions: sds.map((d) => ({
       id: d.id, dpoName: n(d.dpoId), decision: d.decision, rationale: d.rationale, exceptionJustification: d.exceptionJustification,
-      mitigationControls: d.mitigationControls, advice: d.advice, indicatedFull: d.screeningIndicatedFull, superseded: Boolean(d.supersededAt), createdAt: d.createdAt.toISOString(),
+      mitigationControls: d.mitigationControls, advice: d.advice, indicatedFull: d.screeningIndicatedFull, superseded: Boolean(d.supersededAt), ...ver(d.versionId), createdAt: d.createdAt.toISOString(),
     })),
     opinions: ops.map((o) => ({
       id: o.id, kind: o.kind, dpoName: n(o.dpoId), category: o.category, opinionText: o.opinionText, recommendations: o.recommendations,
-      supersedesId: o.supersedesId, superseded: opSup.has(o.id), earlierScreeningCycle: o.kind === "SCREENING" && supersededScreeningSnapshots.has(o.snapshotId), createdAt: o.createdAt.toISOString(),
+      supersedesId: o.supersedesId, superseded: opSup.has(o.id), earlierScreeningCycle: o.kind === "SCREENING" && supersededScreeningSnapshots.has(o.snapshotId), ...ver(o.versionId), createdAt: o.createdAt.toISOString(),
     })),
     blocking: blocking.map((b) => ({
       id: b.id, reason: b.reason, subsectionId: b.subsectionId, raisedByName: n(b.raisedById), raisedAt: b.raisedAt.toISOString(), status: b.status,
@@ -188,7 +189,7 @@ export async function loadGovernance(user: CurrentUser, assessmentId: string): P
     })),
     ownerDecisions: decisions.map((d) => ({
       id: d.id, ownerName: n(d.ownerId), decision: d.decision, rationale: d.rationale, departsFromDpo: d.departsFromDpo, departureRationale: d.departureRationale,
-      supersedesId: d.supersedesId, reviewedSnapshotId: d.reviewedSnapshotId, createdAt: d.createdAt.toISOString(),
+      supersedesId: d.supersedesId, reviewedSnapshotId: d.reviewedSnapshotId, ...ver(d.versionId), createdAt: d.createdAt.toISOString(),
     })),
     conditions: conditionViews,
     measures: measures.filter((m) => m.description || m.responsibleUserId),
