@@ -8,3 +8,4 @@ UI refinement is paused. These are ideas noted so far; none is being implemented
 - Apply the compact record layout and single help-request control to other repeatable sections if it works well in sections 2.1 and 2.2.
 - Reordering records currently reloads the page; make it update in place.
 - Suggestion list for the Q7 recipient-location hint is a short illustrative list; replace with a maintained EU/EEA lookup if the project continues.
+- The Q5 sub-question table's Result column is clipped at about 1000px width with the navigation open (it scrolls sideways); tighten the table or let it wrap. Seen during Railway verification.

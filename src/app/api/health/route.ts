@@ -14,5 +14,7 @@ export async function GET() {
     const p = describeDbProblem(e);
     database = p ? (p.kind === "unknown" ? "error" : p.kind) : "error";
   }
-  return NextResponse.json({ app: "ok", database }, { headers: { "Cache-Control": "no-store" } });
+  // Railway provides the deployed commit; showing the short id lets a deployment be confirmed.
+  const commit = process.env.RAILWAY_GIT_COMMIT_SHA ? process.env.RAILWAY_GIT_COMMIT_SHA.slice(0, 7) : null;
+  return NextResponse.json({ app: "ok", database, commit }, { headers: { "Cache-Control": "no-store" } });
 }

@@ -230,18 +230,28 @@ export function evaluateScreening(ctx: EvalCtx): ScreeningEvaluation {
         .map((r) => (typeof r.value === "string" ? r.value : ""))
         .filter(Boolean);
       const hits = locs.filter((l) => NON_EEA_HINTS.some((h) => new RegExp(`(^|[^a-z])${h.replace(/\./g, "\\.")}([^a-z]|$)`, "i").test(l)));
+      // Q7 is about sharing with, or access by, a third party outside the EU/EEA (including onward transfers,
+      // sub-processors, cloud providers, support teams and group companies). A short list of place names cannot
+      // judge that, so this suggestion can only ever point to Yes. It never suggests No and never treats an
+      // unrecognised or ambiguous location as inside the EU/EEA. Everything else stays unresolved.
+      const reminder =
+        "Question 7 also covers access by support teams, group companies, cloud providers and sub-processors outside the EU/EEA, wherever they are recorded.";
       if (hits.length) {
-        return { s: "YES" as Tri, basis: [`Recipient location entered in 4.7 may be outside the EU/EEA: ${hits.map((h) => `“${h}”`).join(", ")}. Check each one.`] };
-      }
-      if (ctx.get("E.share.none", "")?.value === true && ctx.get("B.proc.none", "")?.value === true) {
-        return { s: "NO" as Tri, basis: ["No data sharing and no processors are recorded."] };
+        return {
+          s: "YES" as Tri,
+          basis: [
+            `A recipient location entered in 4.7 looks like it may be outside the EU/EEA: ${hits.map((h) => `“${h}”`).join(", ")}. Check each one.`,
+            reminder,
+          ],
+        };
       }
       return {
         s: "UNRESOLVED" as Tri,
         basis: [
           locs.length
-            ? `${locs.length} recipient location${locs.length === 1 ? "" : "s"} entered in 4.7; none is recognised as outside the EU/EEA, but check them yourself.`
-            : "No recipient locations have been entered in 4.7.",
+            ? `${locs.length} recipient location${locs.length === 1 ? "" : "s"} entered in 4.7 could not be judged automatically. The check only recognises a short list of well-known places outside the EU/EEA, so this does not mean they are inside the EU/EEA. Check each one yourself.`
+            : "No recipient locations have been entered in 4.7, so no suggestion can be made.",
+          reminder,
         ],
       };
     })(),

@@ -146,15 +146,42 @@ describe("question 6 – provisional handling of 'not already covered'", () => {
   });
 });
 
-describe("question 7", () => {
-  const recs: RecordRow[] = [{ id: "s1", collection: "E.share", ordering: 0 }];
-  it("suggests Yes for a recipient location that looks outside the EU/EEA, but only as a suggestion", () => {
-    const e = ev([r("E.share.location", "Mumbai, India", "ANSWERED", "s1")], recs);
-    expect(e.questions.q7.suggestion).toBe("YES");
-    expect(e.questions.q7.confirmed).toBe("UNRESOLVED"); // not applied until confirmed
+describe("question 7 – a place-name hint must never decide the question", () => {
+  const recs: RecordRow[] = [{ id: "s1", collection: "E.share", ordering: 0 }, { id: "s2", collection: "E.share", ordering: 1 }];
+  const loc = (...ls: string[]) => ev(ls.map((l, i) => r("E.share.location", l, "ANSWERED", `s${i + 1}`)), recs).questions.q7;
+
+  it("suggests Yes only for a recognised place outside the EU/EEA, and never confirms it", () => {
+    const q7 = loc("Mumbai, India");
+    expect(q7.suggestion).toBe("YES");
+    expect(q7.confirmed).toBe("UNRESOLVED");
+    expect(loc("Data centre in the United States").suggestion).toBe("YES");
+    expect(loc("UK").suggestion).toBe("YES");
   });
-  it("stays unresolved for locations it does not recognise", () => {
-    expect(ev([r("E.share.location", "Tallinn, Estonia", "ANSWERED", "s1")], recs).questions.q7.suggestion).toBe("UNRESOLVED");
+  it("leaves unrecognised, ambiguous or EU-sounding locations unresolved, never No and never 'inside the EU/EEA'", () => {
+    for (const place of ["Tallinn, Estonia", "Georgia", "Ukraine", "Indiana", "Sweden", "EU data centre", "Cloud provider, unknown region", "Mauritius", "Norway"]) {
+      const q7 = loc(place);
+      expect(q7.suggestion, place).toBe("UNRESOLVED");
+      expect(q7.basis.join(" "), place).toContain("could not be judged automatically");
+      expect(q7.basis.join(" "), place).toContain("does not mean they are inside the EU/EEA");
+    }
+  });
+  it("never suggests No by default, even with no recipients, no sharing and no processors recorded", () => {
+    expect(ev([]).questions.q7.suggestion).toBe("UNRESOLVED");
+    expect(ev([r("E.share.none", true), r("B.proc.none", true)]).questions.q7.suggestion).toBe("UNRESOLVED");
+    expect(ev([]).questions.q7.basis.join(" ")).toContain("no suggestion can be made");
+  });
+  it("one recognised place makes the suggestion Yes even when another location is unrecognised", () => {
+    expect(loc("Tallinn", "Singapore").suggestion).toBe("YES");
+  });
+  it("always reminds that question 7 covers access by support teams, group companies, cloud providers and sub-processors", () => {
+    expect(loc("Tallinn").basis.join(" ")).toContain("support teams");
+    expect(loc("India").basis.join(" ")).toContain("sub-processors");
+  });
+  it("leaves the source question intact: the confirmed answer comes only from the user", () => {
+    expect(loc("India").confirmed).toBe("UNRESOLVED");
+    const confirmedNo = ev([r("E.share.location", "India", "ANSWERED", "s1"), r("C.q7", "NO")], recs).questions.q7;
+    expect(confirmedNo.confirmed).toBe("NO");
+    expect(confirmedNo.override).toBe(true); // the user may disagree; an explanation is then required
   });
 });
 
