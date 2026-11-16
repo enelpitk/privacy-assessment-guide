@@ -7,6 +7,8 @@ import { getCurrentUser } from "@/lib/session";
 import type { SnapshotPayload } from "@/domain/snapshot";
 import { viewSnapshot } from "@/domain/snapshotView";
 import { loadAccessible } from "@/server/access";
+import { ScreeningSubmissionNote } from "@/components/ScreeningSubmissionNote";
+import { screeningSubmissionInfo } from "@/server/governanceData";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +26,8 @@ export default async function SnapshotPage({ params }: { params: Promise<{ id: s
     const users = await prisma.user.findMany();
     const people = new Map(users.map((u) => [u.id, u.displayName]));
     const sections = viewSnapshot(payload, people);
+    const submissions = snap.kind === "SCREENING_SUBMITTED" ? await screeningSubmissionInfo(id) : {};
+    const fmtTime = (iso: string) => `${iso.slice(0, 16).replace("T", " ")} UTC`;
     const [opinions, decisions, ownerDecisions] = await Promise.all([
       prisma.dpoOpinion.findMany({ where: { assessmentId: id, snapshotId } }),
       prisma.screeningDecision.findMany({ where: { assessmentId: id, snapshotId } }),
@@ -43,6 +47,9 @@ export default async function SnapshotPage({ params }: { params: Promise<{ id: s
           Read-only. Saved {snap.takenAt.toISOString().slice(0, 16).replace("T", " ")} UTC by {people.get(snap.takenById) ?? "unknown"}. Fingerprint {snap.contentHash.slice(0, 12)}. This content can never be
           changed; later edits happen in the current version.
         </p>
+        <div className="mt-2 text-sm">
+          <ScreeningSubmissionNote info={submissions[snap.id]} fmt={fmtTime} hrefFor={(sid) => `/assessments/${id}/versions/${sid}`} />
+        </div>
         <p className="help-text mt-1" data-testid="snapshot-owners">
           Owner recorded when this snapshot was taken: <strong>{people.get(payload.ownerId) ?? "unknown"}</strong>. Current owner of the assessment:{" "}
           <strong>{people.get(assessment.ownerId) ?? "unknown"}</strong>

@@ -34,6 +34,9 @@ import { NON_ASSIGNABLE } from "./assignable";
 export { NON_ASSIGNABLE };
 const PROGRESS_STATES: Lifecycle[] = ["DRAFT", "CHANGES_REQUESTED", "AWAITING_OWNER_DECISION", "AWAITING_CONDITIONS", "FINALISED"];
 
+const STALE_SUBMISSION =
+  "The submission you reviewed is no longer the current one: it was withdrawn or replaced by a newer submission. Reload the page and review the current submission before recording a decision.";
+
 const toDate = (s?: string | null) => (s ? new Date(`${s}T00:00:00Z`) : null);
 const validDate = (s?: string | null) => !s || (/^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(`${s}T00:00:00Z`)));
 
@@ -172,8 +175,11 @@ async function submitScreening(user: CurrentUser, l: Loaded) {
 async function withdrawScreening(user: CurrentUser, l: Loaded) {
   gate(user, l, "withdrawScreening");
   await prisma.$transaction(async (tx) => {
+    // The withdrawn submission is named in the event so history can show which submission was withdrawn.
+    // The snapshot itself is never touched. Older events have no snapshot id; history copes with that.
+    const submitted = await tx.snapshot.findFirst({ where: { assessmentId: l.assessment.id, versionId: l.versionId, kind: "SCREENING_SUBMITTED" }, orderBy: { takenAt: "desc" } });
     await applyPatch(tx, l, patchFor("withdrawScreening", l.state));
-    await event(tx, l, user.id, "SCREENING_WITHDRAWN");
+    await event(tx, l, user.id, "SCREENING_WITHDRAWN", { snapshotId: submitted?.id ?? null });
   });
   return {};
 }
@@ -196,10 +202,14 @@ async function recordScreeningDecision(user: CurrentUser, l: Loaded, i: Extract<
     orderBy: { takenAt: "desc" },
   });
   if (!snap) throw new HttpError(409, "There is no submitted screening snapshot.");
+  if (i.snapshotId !== snap.id) throw new HttpError(409, STALE_SUBMISSION);
   const indicatedFull = Boolean((snap.payload as unknown as SnapshotPayload).screening?.fullDpiaIndicated);
   const errors = validateScreeningDecision(i, indicatedFull);
   if (errors.length) fail(errors);
   return prisma.$transaction(async (tx) => {
+    // Recheck inside the transaction: the DPO decides only on the submission they reviewed.
+    const latest = await tx.snapshot.findFirst({ where: { assessmentId: l.assessment.id, versionId: l.versionId, kind: "SCREENING_SUBMITTED" }, orderBy: { takenAt: "desc" } });
+    if (!latest || latest.id !== i.snapshotId) throw new HttpError(409, STALE_SUBMISSION);
     await tx.screeningDecision.create({
       data: {
         assessmentId: l.assessment.id,

@@ -40,6 +40,16 @@ const status = async (p: Promise<unknown>) => {
     throw e;
   }
 };
+/** The status and message of a refused action (throws if the action was accepted). */
+const refused = async (p: Promise<unknown>) => {
+  try {
+    await p;
+  } catch (e) {
+    if (e instanceof HttpError) return { status: e.status, message: e.message };
+    throw e;
+  }
+  throw new Error("The action was accepted but should have been refused");
+};
 const A = () => table("assessment").find((a) => a.id === id);
 
 /** Fill every applicable gap with "Not sure" plus an explanation, creating required records first. */
@@ -77,6 +87,13 @@ async function save(user: CurrentUser, fieldId: string, value: unknown, recordId
   const f = table("responseField").find((x) => x.versionId === versionId && x.fieldId === fieldId && x.recordId === recordId);
   const res = await saveChanges(user, id, [{ fieldId, recordId, baseRevision: f?.revision ?? 0, value, state: "ANSWERED" }]);
   return res[0].status;
+}
+
+/** The id of the current submitted screening snapshot (what the DPO reviewed). */
+function currentSubmission(): string {
+  const versionId = A().currentVersionId;
+  const snaps = table("snapshot").filter((x) => x.versionId === versionId && x.kind === "SCREENING_SUBMITTED");
+  return snaps.length ? snaps[snaps.length - 1].id : "none";
 }
 
 function setAnswer(fieldId: string, value: unknown, recordId = "", state = "ANSWERED") {
@@ -162,7 +179,7 @@ describe("screening gate", () => {
   it("only the ASSIGNED DPO records the decision; other DPOs and the owner cannot", async () => {
     completeAll();
     await act(owner, { action: "submitScreening" });
-    const decision = { action: "recordScreeningDecision", decision: "PROCEED_FULL", rationale: "Screening indicates a full assessment" } as const;
+    const decision = { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PROCEED_FULL", rationale: "Screening indicates a full assessment" } as const;
     expect(await status(act(dpo2, decision))).toBe(403);
     expect(await status(act(owner, decision))).toBe(403);
     expect(await status(act(admin, decision))).toBe(404);
@@ -173,9 +190,9 @@ describe("screening gate", () => {
   it("a decision needs a rationale; a pre-assessment-only decision needs the short opinion in the same action", async () => {
     completeAll();
     await act(owner, { action: "submitScreening" });
-    expect(await status(act(dpo1, { action: "recordScreeningDecision", decision: "PROCEED_FULL", rationale: " " }))).toBe(422);
-    expect(await status(act(dpo1, { action: "recordScreeningDecision", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "No indication" }))).toBe(422);
-    expect(await status(act(dpo1, { action: "recordScreeningDecision", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "No indication", opinionCategory: "NO_OBJECTIONS", opinionText: "No objections to proceeding on this basis." }))).toBe(200);
+    expect(await status(act(dpo1, { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PROCEED_FULL", rationale: " " }))).toBe(422);
+    expect(await status(act(dpo1, { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "No indication" }))).toBe(422);
+    expect(await status(act(dpo1, { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "No indication", opinionCategory: "NO_OBJECTIONS", opinionText: "No objections to proceeding on this basis." }))).toBe(200);
     expect(A()).toMatchObject({ screeningStatus: "DECIDED", screeningPath: "PRE_ONLY", lifecycle: "AWAITING_OWNER_DECISION" });
     expect(table("dpoOpinion")).toHaveLength(1);
   });
@@ -184,7 +201,7 @@ describe("screening gate", () => {
     completeAll();
     setAnswer("C.q3", "YES"); // confirmed Yes -> full DPIA indicated
     await act(owner, { action: "submitScreening" });
-    const base = { action: "recordScreeningDecision", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "Low risk", opinionCategory: "RECOMMENDATIONS", opinionText: "Proceed with the controls recorded." } as const;
+    const base = { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "Low risk", opinionCategory: "RECOMMENDATIONS", opinionText: "Proceed with the controls recorded." } as const;
     expect(await status(act(dpo1, base))).toBe(422);
     expect(await status(act(dpo1, { ...base, exceptionJustification: "Technology is a vendor-certified, unchanged product" }))).toBe(422);
     expect(await status(act(dpo1, { ...base, exceptionJustification: "Unchanged vendor product", mitigationControls: "Access logging and quarterly review" }))).toBe(200);
@@ -195,7 +212,7 @@ describe("screening gate", () => {
     completeAll();
     setAnswer("D.launchDate", "2027-03-01");
     await act(owner, { action: "submitScreening" });
-    await act(dpo1, { action: "recordScreeningDecision", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "No indication", opinionCategory: "NO_OBJECTIONS", opinionText: "No objections." });
+    await act(dpo1, { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "No indication", opinionCategory: "NO_OBJECTIONS", opinionText: "No objections." });
     const kept = table("responseField").find((f) => f.fieldId === "D.launchDate");
     expect(kept.value).toBe("2027-03-01"); // preserved
     const versionId = A().currentVersionId;
@@ -210,7 +227,7 @@ describe("screening gate", () => {
   it("reopening a decided screening invalidates the decision, keeps history and requires renewed review", async () => {
     completeAll();
     await act(owner, { action: "submitScreening" });
-    await act(dpo1, { action: "recordScreeningDecision", decision: "PROCEED_FULL", rationale: "Proceed" });
+    await act(dpo1, { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PROCEED_FULL", rationale: "Proceed" });
     await act(owner, { action: "reopenScreening" });
     expect(A()).toMatchObject({ screeningStatus: "INVALIDATED", screeningPath: "OPEN", lifecycle: "DRAFT" });
     expect(table("screeningDecision")[0].supersededAt).toBeTruthy(); // kept, marked superseded
@@ -227,10 +244,100 @@ describe("screening gate", () => {
 async function toFullReview() {
   completeAll();
   await act(owner, { action: "submitScreening" });
-  await act(dpo1, { action: "recordScreeningDecision", decision: "PROCEED_FULL", rationale: "Proceed" });
+  await act(dpo1, { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PROCEED_FULL", rationale: "Proceed" });
   completeAll();
   await act(owner, { action: "submitFull" });
 }
+
+describe("screening withdrawal, resubmission and stale DPO decisions", () => {
+  const snapshotRows = () => JSON.stringify(table("snapshot"));
+
+  it("withdrawing names the withdrawn submission in its event, keeps the snapshot, and a resubmission is a new snapshot linked to it", async () => {
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    const first = currentSubmission();
+    const before = snapshotRows();
+    await act(owner, { action: "withdrawScreening" });
+    expect(table("event").find((e) => e.type === "SCREENING_WITHDRAWN")?.payload).toEqual({ snapshotId: first });
+    expect(snapshotRows()).toBe(before); // the snapshot is untouched
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    const second = currentSubmission();
+    expect(second).not.toBe(first);
+    expect(table("snapshot")).toHaveLength(2);
+    expect(JSON.stringify(table("snapshot").slice(0, 1))).toBe(JSON.stringify(JSON.parse(before)));
+    const g = await loadGovernance(owner, id);
+    const s1 = g.snapshots.find((x) => x.id === first)!.screeningSubmission!;
+    const s2 = g.snapshots.find((x) => x.id === second)!.screeningSubmission!;
+    expect(s1).toMatchObject({ withdrawn: true, replacedBySnapshotId: second, exact: true });
+    expect(s2).toMatchObject({ withdrawn: false, resubmissionOfSnapshotId: first });
+    expect(g.screening?.snapshotId).toBe(second);
+  });
+
+  it("an older withdrawal event without a snapshot id is still shown as withdrawn (matched by time)", async () => {
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    const first = currentSubmission();
+    await act(owner, { action: "withdrawScreening" });
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    const ev = table("event").find((e) => e.type === "SCREENING_WITHDRAWN")!;
+    ev.payload = null; // simulate an event recorded before the snapshot id was added
+    const g = await loadGovernance(owner, id);
+    expect(g.snapshots.find((x) => x.id === first)!.screeningSubmission).toMatchObject({ withdrawn: true, exact: false, replacedBySnapshotId: currentSubmission() });
+  });
+
+  it("a withdrawal with no resubmission yet leaves the submission withdrawn and the screening not submitted", async () => {
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    await act(owner, { action: "withdrawScreening" });
+    const g = await loadGovernance(owner, id);
+    expect(g.state.screeningStatus).toBe("NOT_SUBMITTED");
+    expect(g.snapshots.find((x) => x.id === currentSubmission())!.screeningSubmission).toMatchObject({ withdrawn: true, replacedBySnapshotId: null });
+  });
+
+  it("the DPO decision is bound to the reviewed snapshot: a stale snapshot id is refused with a reload message and nothing is recorded", async () => {
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    const reviewed = currentSubmission(); // what the DPO has on screen
+    await act(owner, { action: "withdrawScreening" });
+    completeAll();
+    await act(owner, { action: "submitScreening" }); // a newer submission replaces it
+    const latest = currentSubmission();
+    const stale = await refused(act(dpo1, { action: "recordScreeningDecision", snapshotId: reviewed, decision: "PROCEED_FULL", rationale: "Based on the old submission" }));
+    expect(stale.status).toBe(409);
+    expect(stale.message).toContain("Reload the page");
+    expect(table("screeningDecision")).toHaveLength(0);
+    expect(A()).toMatchObject({ screeningStatus: "AWAITING_DPO", screeningPath: "OPEN" });
+    // the current snapshot is accepted and the decision references it
+    expect(await status(act(dpo1, { action: "recordScreeningDecision", snapshotId: latest, decision: "PROCEED_FULL", rationale: "Based on the current submission" }))).toBe(200);
+    expect(table("screeningDecision")[0].snapshotId).toBe(latest);
+  });
+
+  it("a decision without a snapshot id, or after the submission was withdrawn, is refused", async () => {
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    const missing = await refused(act(dpo1, { action: "recordScreeningDecision", decision: "PROCEED_FULL", rationale: "No snapshot named" } as ActionInput));
+    expect(missing.status).toBe(409);
+    expect(missing.message).toContain("Reload the page");
+    const reviewed = currentSubmission();
+    await act(owner, { action: "withdrawScreening" });
+    expect(await status(act(dpo1, { action: "recordScreeningDecision", snapshotId: reviewed, decision: "PROCEED_FULL", rationale: "Too late" }))).toBe(409);
+    expect(table("screeningDecision")).toHaveLength(0);
+  });
+
+  it("role and state checks are unchanged: other DPOs and the owner are refused even with the right snapshot id, and a decided screening cannot be withdrawn", async () => {
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    const snapshotId = currentSubmission();
+    const body = { action: "recordScreeningDecision", snapshotId, decision: "PROCEED_FULL", rationale: "Proceed" } as const;
+    expect(await status(act(dpo2, body))).toBe(403);
+    expect(await status(act(owner, body))).toBe(403);
+    expect(await status(act(contrib, { action: "withdrawScreening" }))).toBe(404);
+    expect(await status(act(dpo1, body))).toBe(200);
+    expect(await status(act(owner, { action: "withdrawScreening" }))).toBe(409); // after the decision: Reopen screening is the existing path
+  });
+});
 
 describe("full review gate", () => {
   it("cannot be submitted before the DPO decides to proceed", async () => {
@@ -415,7 +522,7 @@ describe("pre-assessment-only path", () => {
   it("the owner then records the final decision without a second submission", async () => {
     completeAll();
     await act(owner, { action: "submitScreening" });
-    await act(dpo1, { action: "recordScreeningDecision", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "No indication", opinionCategory: "NO_OBJECTIONS", opinionText: "No objections." });
+    await act(dpo1, { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "No indication", opinionCategory: "NO_OBJECTIONS", opinionText: "No objections." });
     expect(await status(act(owner, { action: "submitFull" }))).toBe(409);
     expect(await status(act(owner, { action: "reopenForChanges" }))).toBe(409);
     await act(owner, { action: "ownerDecision", decision: "APPROVED", rationale: "Pre-assessment sufficient" });
@@ -428,7 +535,7 @@ describe("CD-34: an earlier short opinion stays historical after the screening i
   async function preOnlyThenReopen() {
     completeAll();
     await act(owner, { action: "submitScreening" });
-    await act(dpo1, { action: "recordScreeningDecision", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "No indication", opinionCategory: "NO_OBJECTIONS", opinionText: "Short opinion, first screening cycle." });
+    await act(dpo1, { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "No indication", opinionCategory: "NO_OBJECTIONS", opinionText: "Short opinion, first screening cycle." });
     expect(await status(act(owner, { action: "reopenScreening" }))).toBe(200);
   }
 
@@ -443,9 +550,9 @@ describe("CD-34: an earlier short opinion stays historical after the screening i
     expect(await status(act(owner, { action: "submitFull" }))).toBe(409);
     completeAll();
     await act(owner, { action: "submitScreening" });
-    expect(await status(act(dpo1, { action: "recordScreeningDecision", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "Again" }))).toBe(422); // a new short opinion is required
+    expect(await status(act(dpo1, { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "Again" }))).toBe(422); // a new short opinion is required
     expect(table("screeningDecision").filter((d) => !d.supersededAt)).toHaveLength(0);
-    await act(dpo1, { action: "recordScreeningDecision", decision: "PROCEED_FULL", rationale: "Full assessment needed" });
+    await act(dpo1, { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PROCEED_FULL", rationale: "Full assessment needed" });
     expect(await status(act(owner, { action: "ownerDecision", decision: "APPROVED", rationale: "Using the old opinion" }))).toBe(409); // still no full-review opinion
     completeAll();
     await act(owner, { action: "submitFull" });
@@ -466,7 +573,7 @@ describe("CD-34: an earlier short opinion stays historical after the screening i
     expect(g.opinions[0]).toMatchObject({ kind: "SCREENING", earlierScreeningCycle: true, superseded: false });
     completeAll();
     await act(owner, { action: "submitScreening" });
-    await act(dpo1, { action: "recordScreeningDecision", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "Still sufficient", opinionCategory: "RECOMMENDATIONS", opinionText: "Second cycle opinion." });
+    await act(dpo1, { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "Still sufficient", opinionCategory: "RECOMMENDATIONS", opinionText: "Second cycle opinion." });
     g = await loadGovernance(dpo1, id);
     expect(g.opinions.map((o) => o.earlierScreeningCycle)).toEqual([true, false]);
     expect(JSON.stringify(table("dpoOpinion").slice(0, 1))).toBe(JSON.stringify(JSON.parse(before)));
@@ -475,7 +582,7 @@ describe("CD-34: an earlier short opinion stays historical after the screening i
   it("after a new revision, earlier versions' decisions, opinions and owner decisions are labelled with their version and not as current, and the stored rows are unchanged", async () => {
     completeAll();
     await act(owner, { action: "submitScreening" });
-    await act(dpo1, { action: "recordScreeningDecision", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "No indication", opinionCategory: "NO_OBJECTIONS", opinionText: "No objections." });
+    await act(dpo1, { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "No indication", opinionCategory: "NO_OBJECTIONS", opinionText: "No objections." });
     await act(owner, { action: "ownerDecision", decision: "APPROVED", rationale: "Approved" });
     const before = JSON.stringify([table("screeningDecision"), table("dpoOpinion"), table("ownerDecision"), table("snapshot")]);
     let g = await loadGovernance(owner, id);
@@ -490,7 +597,7 @@ describe("CD-34: an earlier short opinion stays historical after the screening i
   it("the version data marks a rejected finalised version as rejected, and an approved one not", async () => {
     completeAll();
     await act(owner, { action: "submitScreening" });
-    await act(dpo1, { action: "recordScreeningDecision", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "No indication", opinionCategory: "NO_OBJECTIONS", opinionText: "No objections." });
+    await act(dpo1, { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "No indication", opinionCategory: "NO_OBJECTIONS", opinionText: "No objections." });
     await act(owner, { action: "ownerDecision", decision: "REJECTED", rationale: "Not proceeding" });
     const g = await loadGovernance(owner, id);
     expect(g.state.lifecycle).toBe("FINALISED");
@@ -501,7 +608,7 @@ describe("CD-34: an earlier short opinion stays historical after the screening i
     await preOnlyThenReopen();
     completeAll();
     await act(owner, { action: "submitScreening" });
-    expect(await status(act(dpo1, { action: "recordScreeningDecision", decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "Still sufficient", opinionCategory: "RECOMMENDATIONS", opinionText: "Second cycle opinion." }))).toBe(200);
+    expect(await status(act(dpo1, { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PRE_ASSESSMENT_SUFFICIENT", rationale: "Still sufficient", opinionCategory: "RECOMMENDATIONS", opinionText: "Second cycle opinion." }))).toBe(200);
     const ops = table("dpoOpinion");
     expect(ops).toHaveLength(2);
     expect(ops[1].snapshotId).not.toBe(ops[0].snapshotId);
@@ -672,8 +779,8 @@ describe("ownership transfer and DPO reassignment", () => {
     completeAll();
     await act(owner, { action: "submitScreening" });
     await act(admin, { action: "reassignDpo", newDpoId: "d2", reason: "Workload" });
-    expect(await status(act(dpo1, { action: "recordScreeningDecision", decision: "PROCEED_FULL", rationale: "x" }))).toBe(403);
-    await act(dpo2, { action: "recordScreeningDecision", decision: "PROCEED_FULL", rationale: "Proceed" });
+    expect(await status(act(dpo1, { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PROCEED_FULL", rationale: "x" }))).toBe(403);
+    await act(dpo2, { action: "recordScreeningDecision", snapshotId: currentSubmission(), decision: "PROCEED_FULL", rationale: "Proceed" });
     expect(table("screeningDecision")[0].dpoId).toBe("d2");
     await act(admin, { action: "reassignDpo", newDpoId: "d1", reason: "Back again" });
     expect(table("screeningDecision")[0].dpoId).toBe("d2"); // original author preserved

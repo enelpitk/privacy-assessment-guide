@@ -188,6 +188,44 @@ describe("review screen shows the right actions to the right role", () => {
     expect(cur).toContain("Version 2.0 (this version)");
     expect(cur).not.toContain("earlier version, historical");
   });
+  it("withdrawn screening submission: Review and decisions says it was withdrawn and that the next submission is new; the DPO sees no decision form", () => {
+    const snaps = [{ id: "s1", kind: "SCREENING_SUBMITTED", versionNumber: "1.0", takenAt: "2026-11-08T10:00:00.000Z", takenByName: "Alex Rowan", hash: "abc", screeningSubmission: { withdrawn: true, withdrawnAt: "2026-11-08T11:00:00.000Z", replacedBySnapshotId: null, resubmissionOfSnapshotId: null, resubmissionOfWithdrawnAt: null, exact: true } }];
+    const g = gov({ snapshots: snaps, screening: { fullDpiaIndicated: false, tiaIndicated: false, unresolved: [], snapshotId: "s1" }, state: { ...gov().state, screeningStatus: "NOT_SUBMITTED" } });
+    const html = review("owner", g, { screeningStatus: "NOT_SUBMITTED" });
+    expect(html).toContain("Withdrawn for editing on");
+    expect(html).toContain("not decided and is kept as history");
+    expect(html).toContain("The next submission will be a new submission for the DPO to review.");
+    expect(html).toContain("Screening indications at the withdrawn submission");
+    expect(review("dpo", g, { screeningStatus: "NOT_SUBMITTED" })).not.toContain("Record screening decision");
+  });
+  it("resubmission: the awaiting-DPO view says this is a new submission and links the withdrawn one; History shows both relationships", () => {
+    const w = { withdrawn: true, withdrawnAt: "2026-11-08T11:00:00.000Z", replacedBySnapshotId: "s2", resubmissionOfSnapshotId: null, resubmissionOfWithdrawnAt: null, exact: true };
+    const n = { withdrawn: false, withdrawnAt: null, replacedBySnapshotId: null, resubmissionOfSnapshotId: "s1", resubmissionOfWithdrawnAt: "2026-11-08T11:00:00.000Z", exact: true };
+    const snaps = [
+      { id: "s1", kind: "SCREENING_SUBMITTED", versionNumber: "1.0", takenAt: "2026-11-08T10:00:00.000Z", takenByName: "Alex Rowan", hash: "aaa", screeningSubmission: w },
+      { id: "s2", kind: "SCREENING_SUBMITTED", versionNumber: "1.0", takenAt: "2026-11-08T12:00:00.000Z", takenByName: "Alex Rowan", hash: "bbb", screeningSubmission: n },
+    ];
+    const g = gov({ snapshots: snaps, screening: { fullDpiaIndicated: false, tiaIndicated: false, unresolved: [], snapshotId: "s2" }, state: { ...gov().state, screeningStatus: "AWAITING_DPO" } });
+    const html = review("owner", g, { screeningStatus: "AWAITING_DPO" });
+    expect(html).toContain("New submission.");
+    expect(html).toContain("Only this submission is under review.");
+    expect(html).toMatch(/<a[^>]*href="\/assessments\/a1\/versions\/s1"[^>]*>View the withdrawn submission<\/a>/);
+    const hist = history("owner", g);
+    expect(hist).toContain("Withdrawn for editing on");
+    expect(hist).toContain("a later submission");
+    expect(hist).toContain("New submission.");
+  });
+  it("an older withdrawal that does not name the submission is still shown, with a note that it was matched by time", () => {
+    const snaps = [{ id: "s1", kind: "SCREENING_SUBMITTED", versionNumber: "1.0", takenAt: "2026-11-08T10:00:00.000Z", takenByName: "Alex Rowan", hash: "abc", screeningSubmission: { withdrawn: true, withdrawnAt: "2026-11-08T11:00:00.000Z", replacedBySnapshotId: null, resubmissionOfSnapshotId: null, resubmissionOfWithdrawnAt: null, exact: false } }];
+    const html = history("owner", gov({ snapshots: snaps }));
+    expect(html).toContain("Withdrawn for editing on");
+    expect(html).toContain("Matched by time");
+  });
+  it("an ordinary submitted screening shows no withdrawal note", () => {
+    const snaps = [{ id: "s1", kind: "SCREENING_SUBMITTED", versionNumber: "1.0", takenAt: "2026-11-08T10:00:00.000Z", takenByName: "Alex Rowan", hash: "abc", screeningSubmission: { withdrawn: false, withdrawnAt: null, replacedBySnapshotId: null, resubmissionOfSnapshotId: null, resubmissionOfWithdrawnAt: null, exact: false } }];
+    expect(history("owner", gov({ snapshots: snaps }))).not.toContain("Withdrawn for editing on");
+    expect(history("owner", gov({ snapshots: snaps }))).not.toContain("New submission.");
+  });
   it("shows a recorded departure from the DPO's opinion prominently", () => {
     const g = gov({ ownerDecisions: [{ id: "d", ownerName: "Alex Rowan", decision: "APPROVED", rationale: "Approved.", departsFromDpo: true, departureRationale: "We accept the residual risk.", supersedesId: null, reviewedSnapshotId: "s", versionNumber: "1.0", currentVersion: true, createdAt: "2026-11-08T12:00:00.000Z" }] });
     expect(review("dpo", g)).toContain("departs from the DPO’s opinion and accepts the risk");

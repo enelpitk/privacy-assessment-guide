@@ -15,6 +15,7 @@ import {
 } from "@/content";
 import type { EvalCtx } from "@/domain/conditions";
 import { canChangeRecords, isScreeningLock } from "@/domain/permissions";
+import { canWorkflow } from "@/domain/workflow";
 import {
   buildModel,
   isItemActive,
@@ -59,6 +60,8 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
   const canStructure = canChangeRecords(page.actor, page.ctx, sub.id);
   // Submitted screening view: no lock notice and no section comments link (access control is unchanged).
   const screeningLocked = isScreeningLock(canStructure);
+  // Only the owner, and only while the screening is with the DPO (when "Withdraw for editing" is available), is pointed to it.
+  const showWithdrawHint = screeningLocked && page.ctx.screeningStatus === "AWAITING_DPO" && canWorkflow(page.actor, page.ctx, "withdrawScreening").ok;
 
   return (
     <div className={`grid gap-5 ${sub.noAbout ? "" : "lg:grid-cols-[minmax(0,1fr)_auto]"}`}>
@@ -74,6 +77,15 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
             <summary className="w-fit cursor-pointer text-brand-700">Guidance</summary>
             <HelpPanel summary={sub.summary} intro={sub.intro} help={sub.help} />
           </details>
+        ) : null}
+        {showWithdrawHint ? (
+          <p className="mt-2 max-w-prose2 text-sm" data-testid="withdraw-hint">
+            The screening is with the DPO. To change these answers, withdraw it for editing on{" "}
+            <a className="btn-link" href={`/assessments/${page.assessment.id}/review`}>
+              Review and decisions
+            </a>
+            .
+          </p>
         ) : null}
         <CarriedForward subsectionId={sub.id} />
 

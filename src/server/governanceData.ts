@@ -12,6 +12,7 @@ import { buildModel, evaluateAssessment } from "@/domain/model";
 import { SCREENING_SUBSECTIONS, rolesOf, submissionBlockers, type Path } from "@/domain/workflow";
 import type { SnapshotPayload } from "@/domain/snapshot";
 import { isVersionRejected } from "@/lib/labels";
+import { deriveScreeningSubmissions } from "@/domain/submissions";
 import { load, stateOf } from "./governance";
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
@@ -156,6 +157,7 @@ export async function loadGovernance(user: CurrentUser, assessmentId: string): P
   }));
 
   const ver = (versionId: string) => ({ versionNumber: versions.find((v) => v.id === versionId)?.versionNumber ?? "", currentVersion: versionId === vid });
+  const submissionInfo = await screeningSubmissionInfo(assessmentId, snaps);
   const sharedIds = new Set(access.map((x) => x.userId));
   const state = await stateOf(prisma, a);
 
@@ -195,6 +197,7 @@ export async function loadGovernance(user: CurrentUser, assessmentId: string): P
     measures: measures.filter((m) => m.description || m.responsibleUserId),
     snapshots: snaps.map((s) => ({
       id: s.id, kind: s.kind, versionNumber: versions.find((v) => v.id === s.versionId)?.versionNumber ?? "", takenAt: s.takenAt.toISOString(), takenByName: n(s.takenById), hash: s.contentHash.slice(0, 12),
+      ...(s.kind === "SCREENING_SUBMITTED" ? { screeningSubmission: submissionInfo[s.id] } : {}),
     })),
     versions: versions.map((v) => ({
       id: v.id, versionNumber: v.versionNumber, kind: v.kind, createdAt: v.createdAt.toISOString(), reason: v.revisionReason, changeDescription: v.changeDescription,
@@ -235,4 +238,17 @@ export async function loadThreads(versionId: string, assessmentId: string): Prom
       (c): CommentView => ({ id: c.id, authorId: c.authorId, authorName: name.get(c.authorId) ?? "Unknown user", body: c.body, createdAt: c.createdAt.toISOString(), parentId: c.parentId, isReview: c.isReview }),
     ),
   }));
+}
+
+/** Withdrawn / resubmitted relationships of screening submissions, derived from existing snapshots and events (nothing is stored). */
+export async function screeningSubmissionInfo(
+  assessmentId: string,
+  snaps?: { id: string; kind: string; versionId: string; takenAt: Date }[],
+) {
+  const snapshots = snaps ?? (await prisma.snapshot.findMany({ where: { assessmentId }, select: { id: true, kind: true, versionId: true, takenAt: true } }));
+  const events = await prisma.event.findMany({ where: { assessmentId, type: "SCREENING_WITHDRAWN" }, orderBy: { createdAt: "asc" } });
+  return deriveScreeningSubmissions(
+    snapshots.map((s) => ({ id: s.id, kind: s.kind, versionId: s.versionId, takenAt: s.takenAt.toISOString() })),
+    events.map((e) => ({ type: e.type, versionId: e.versionId, createdAt: e.createdAt.toISOString(), payload: (e.payload as Record<string, unknown> | null) ?? null })),
+  );
 }

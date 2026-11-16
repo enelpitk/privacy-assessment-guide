@@ -18,6 +18,8 @@ export const ActionSchema = z.discriminatedUnion("action", [
   A("withdrawScreening", {}),
   A("reopenScreening", {}),
   A("recordScreeningDecision", {
+    /** The submitted screening snapshot the DPO reviewed. The decision is refused if it is no longer the current submission. */
+    snapshotId: id.optional(),
     decision: z.enum(["PROCEED_FULL", "PRE_ASSESSMENT_SUFFICIENT"]),
     rationale: text(),
     exceptionJustification: text().optional(),

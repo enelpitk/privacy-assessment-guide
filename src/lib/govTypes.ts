@@ -1,3 +1,4 @@
+import type { ScreeningSubmissionInfo } from "@/domain/submissions";
 // Serialisable shapes passed from server loaders to the governance screens.
 import type { Blocker, OpinionCategory, Path } from "@/domain/workflow";
 
@@ -116,6 +117,8 @@ export interface SnapshotView {
   takenAt: string;
   takenByName: string;
   hash: string;
+  /** Screening snapshots only: whether this submission was withdrawn and how it relates to a later submission. */
+  screeningSubmission?: ScreeningSubmissionInfo;
 }
 
 export interface VersionView {

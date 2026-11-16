@@ -126,3 +126,31 @@ describe("the permission rule itself is unchanged", () => {
     expect(canEditField(owner, ctx, { id: "x", changeClass: "SUBSTANTIVE" }, "D1")).toEqual({ ok: true });
   });
 });
+
+describe("owner-only hint: how to change locked screening answers", () => {
+  const hint = (h: string) => h.includes('data-testid="withdraw-hint"');
+
+  it("the owner sees a short hint with a link to Review and decisions while the screening is with the DPO", () => {
+    const h = html("C1", page("owner", submitted));
+    expect(hint(h)).toBe(true);
+    expect(h).toContain("The screening is with the DPO. To change these answers, withdraw it for editing on");
+    expect(h).toMatch(/<a[^>]*href="\/assessments\/a1\/review"[^>]*>Review and decisions<\/a>/);
+    // the generic lock notice stays removed
+    expect(h).not.toContain(SCREENING_LOCK_REASON);
+    expect(h).not.toContain("You can read this section but not edit it");
+    expect(h).not.toContain("Read-only:");
+  });
+  it("it appears in other submitted screening sections too (1.1, 2.1, 3.2)", () => {
+    for (const sub of ["A1", "B1", "C1"]) expect(hint(html(sub, page("owner", submitted))), sub).toBe(true);
+  });
+  it("it is not shown to the DPO or to an assigned contributor", () => {
+    expect(hint(html("C1", page("dpo", submitted)))).toBe(false);
+    expect(hint(html("C1", page("assignee", submitted)))).toBe(false);
+  });
+  it("it is not shown when withdrawal is unavailable: decided, not submitted, archived, or sections after the screening", () => {
+    expect(hint(html("C1", page("owner", { lifecycle: "DRAFT", screeningStatus: "DECIDED" })))).toBe(false);
+    expect(hint(html("C1", page("owner", { lifecycle: "DRAFT", screeningStatus: "NOT_SUBMITTED" })))).toBe(false);
+    expect(hint(html("C1", page("owner", { lifecycle: "ARCHIVED", screeningStatus: "AWAITING_DPO" })))).toBe(false);
+    expect(hint(html("D1", page("owner", submitted)))).toBe(false);
+  });
+});

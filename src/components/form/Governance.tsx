@@ -6,6 +6,7 @@ import { rolesOf, CHANGE_CATEGORIES } from "@/domain/workflow";
 import type { GovernanceData } from "@/lib/govTypes";
 import { lifecycleLabel, SCREENING_LABEL } from "@/lib/labels";
 import { NON_ASSIGNABLE } from "@/server/assignable";
+import { ScreeningSubmissionNote } from "@/components/ScreeningSubmissionNote";
 import { useStoreCtx } from "./context";
 import { formatTime } from "./Fields";
 import { useCollab, useRunner } from "./collab";
@@ -189,6 +190,8 @@ function ScreeningCard({ gov }: { gov: GovernanceData }) {
   const [cat, setCat] = useState("NO_OBJECTIONS");
   const [op, setOp] = useState("");
   const indicated = gov.screening?.fullDpiaIndicated ?? false;
+  // The submission this card is about: the latest screening snapshot of the current version.
+  const currentSubmission = gov.snapshots.find((x) => x.id === gov.screening?.snapshotId);
   const preOnly = decision === "PRE_ASSESSMENT_SUFFICIENT";
   const valid = rationale.trim() !== "" && (!preOnly || (op.trim() !== "" && (!indicated || (exc.trim() !== "" && mit.trim() !== ""))));
 
@@ -196,7 +199,7 @@ function ScreeningCard({ gov }: { gov: GovernanceData }) {
     <Card title="Gate 1: screening review (pre-assessment)">
       {gov.screening ? (
         <p>
-          Screening indications at submission:{" "}
+          {currentSubmission?.screeningSubmission?.withdrawn && s.screeningStatus !== "AWAITING_DPO" ? "Screening indications at the withdrawn submission" : "Screening indications at submission"}:{" "}
           <strong>{gov.screening.fullDpiaIndicated ? "Full DPIA indicated" : "no full DPIA indication"}</strong>;{" "}
           <strong>{gov.screening.tiaIndicated ? "TIA follow-up indicated" : "no TIA follow-up indicated"}</strong>
           {gov.screening.unresolved.length ? `; ${gov.screening.unresolved.length} screening question(s) unresolved` : ""}. These are indications under the template rules, not conclusions.
@@ -204,6 +207,12 @@ function ScreeningCard({ gov }: { gov: GovernanceData }) {
       ) : (
         <p>The pre-assessment (sections 1 to 3) has not been submitted yet.</p>
       )}
+      <ScreeningSubmissionNote
+        info={currentSubmission?.screeningSubmission}
+        fmt={formatTime}
+        hrefFor={(id) => `/assessments/${page.assessment.id}/versions/${id}`}
+        stillCurrentStatus={s.screeningStatus}
+      />
 
       {roles.owner && (s.screeningStatus === "NOT_SUBMITTED" || s.screeningStatus === "INVALIDATED") && draftish ? (
         <>
@@ -239,7 +248,7 @@ function ScreeningCard({ gov }: { gov: GovernanceData }) {
           action="recordScreeningDecision"
           submit="Record screening decision"
           valid={valid}
-          fields={{ decision, rationale, advice: advice || undefined, exceptionJustification: exc || undefined, mitigationControls: mit || undefined, opinionCategory: preOnly ? cat : undefined, opinionText: preOnly ? op : undefined }}
+          fields={{ snapshotId: gov.screening?.snapshotId ?? undefined, decision, rationale, advice: advice || undefined, exceptionJustification: exc || undefined, mitigationControls: mit || undefined, opinionCategory: preOnly ? cat : undefined, opinionText: preOnly ? op : undefined }}
         >
           <fieldset>
             <legend className="font-medium">Decision (DPO)</legend>
@@ -958,6 +967,7 @@ export function HistoryPanel({ gov }: { gov: GovernanceData }) {
                         {sn.kind === "SCREENING_SUBMITTED" ? "Screening snapshot" : sn.kind === "FULL_SUBMITTED" ? "Submitted snapshot" : "Finalised snapshot"}
                       </a>{" "}
                       — {formatTime(sn.takenAt)} by {sn.takenByName} · fingerprint {sn.hash}
+                      <ScreeningSubmissionNote info={sn.screeningSubmission} fmt={formatTime} hrefFor={(id) => `/assessments/${page.assessment.id}/versions/${id}`} />
                     </li>
                   ))}
               </ul>
