@@ -1,16 +1,23 @@
 # Handover for a new session
 
-Updated 2026-11-07 after the Stage 4 decision review and the Stage 4 prototype verification on Railway. **Stage 5 has not been started and is not authorised.** Sections 1 to 8 below were written at the end of Stage 4 and are kept for reference; where they say Stage 4 is "not verified" or "awaiting confirmation", this section supersedes them. Read this file first, then `CLAUDE.md`. `DPIA_Template.docx` is git-ignored source material and must never be committed.
+Updated 2026-11-07 (final state of the day) after the Stage 4 decision review, the Stage 4 prototype verification on Railway and the homework footer pull request. **Stage 5 has not been started and is not authorised.** Sections 1 to 8 below were written at the end of Stage 4 and are kept for reference; where they say Stage 4 is "not verified" or "awaiting confirmation", this section supersedes them. Read this file first, then `CLAUDE.md`. `DPIA_Template.docx` is git-ignored source material and must never be committed.
 
 ## 0. Current state
 
-- **Commit on `main` and running on Railway:** `12eb21a` ("Stage 4 display fixes…"). `/api/health` returned `{"app":"ok","database":"ok","commit":"12eb21a"}`. Recent commits: `f9f9384` (confirmed decisions and first display corrections), `8690065` (the previous handover).
+- **Commit on `main`:** `31ebc04` ("Merge pull request #1 from enelpitk/feature/footer"), described under "Homework pull request" below. Before that merge, `main` was at `bf5244f` (handover update) and Railway was running `12eb21a` ("Stage 4 display fixes…"), verified by this session. `/api/health` returned `{"app":"ok","database":"ok","commit":"12eb21a"}`. Other recent commits: `f9f9384` (confirmed decisions and first display corrections), `8690065` (the previous handover).
 - **Decisions:** CD-28 to CD-35 are all confirmed by the project owner (scope, corrections and limitations are in `docs/content-decisions.md`). Implemented in this session: CD-30 reminder; CD-31 carry-forward of each measure's latest recorded status with "Status at decision" / "Latest recorded status"; CD-33 reuse of an existing viewer share plus owner-at-snapshot versus current-owner lines; "Finalised — Rejected" label; "Earlier screening cycle" opinion label; awaiting-DPO summary that follows the calculated outcome; records of earlier versions labelled with their version and as historical.
 - **Prototype checks completed on Railway (built-in browser, see `docs/verification.md`):**
   - Deployment ACTIVE; log "2 migrations found … No pending migrations to apply" (the Stage 4 migration was applied by an earlier deployment).
   - Test 1 (assignment boundary, CD-32) on "TEST Stage 4 verification (fictional)": 13 steps; several denied-edit checks are **UI only** (server refusal untested).
   - Test 2 (pre-assessment-only path): screening, DPO decision with short opinion, owner approval, new revision 2.0; both version 1.0 snapshots showed the same fingerprints and page content before and after (**observed preservation, not proof of database-level immutability**).
   - After deploying `12eb21a`: revision 2.0's Review page, section 3.10 and section 11.4 were opened. Earlier screening decision, DPO opinion and owner decision are labelled "Version 1.0 — earlier version, historical; does not apply to this version", and the draft shows "No decision recorded yet for this version" / "No owner decision is recorded yet".
+- **Homework pull request (footer exercise), owner-reported unless stated:**
+  - Pull request #1 (`feature/footer` into `main`) added the line "© 2026 Harbour Financial Group. Built with Claude Code" to the shared footer in `src/app/layout.tsx` (feature-branch commit `963d3a3`, "add footer"). The owner reviewed it, published an inline review comment, and merged it. The merge commit on `main` is `31ebc04`.
+  - Railway showed the deployment ACTIVE / "Deployment successful". The owner confirmed the footer is visible in the live app and that the existing Stage 4 assessment answers remain visible.
+  - The owner tested the app on a phone in Google Chrome and reported that the functionality worked. This is an owner report, not a recorded test script; no mobile layout or accessibility findings were captured.
+  - Railway usage was approximately $0.01 with $5.00 of credit available.
+  - **Health check (read-only, 2026-11-16, start of a later session):** `/api/health` returned `{"app":"ok","database":"ok","commit":"31ebc04"}`, so the running commit is the merge commit. The deployment status, footer visibility, phone test and credit figures above remain owner reports.
+- **Local repository at the time of writing:** current branch `main`, HEAD `31ebc04`, local `main` includes `31ebc04` and matches `origin/main` as last fetched; `feature/footer` still exists locally and on the remote (at `963d3a3`). The working tree has no tracked changes. The untracked `.vscode/settings.json` is the owner's local workspace TypeScript selection; leave it unchanged and uncommitted.
 - **Test data kept on Railway:** "TEST Stage 4 verification (fictional)" (DPIA-2026-0004, now version 2.0 draft, version 1.0 finalised; submitted, so archive-only), "TEST Stage 3 verification (fictional)" (DPIA-2026-0003), and two earlier test drafts (DPIA-2026-0001 and -0002). Nothing was reset or reseeded.
 
 ## 0.1 Remaining limitations (not verified)
@@ -26,7 +33,7 @@ Updated 2026-11-07 after the Stage 4 decision review and the Stage 4 prototype v
 
 ## 0.2 Next step
 
-Wait for the project owner's instruction. Stage 5 is **not authorised**; UI refinement is paused; the coursework feature-branch and pull-request exercise (including its footer change) must not be done unless explicitly requested. Verification is intentionally proportionate to a homework prototype: do not expand testing to every edge case without a new instruction. If asked to continue verification, the most valuable untested item is one run of the full-assessment review path on Railway (see 0.1).
+Wait for the project owner's instruction. **Usability improvements remain future work** (see the UI ideas and display observations in `docs/backlog.md`); none is authorised yet. Stage 5 is **not authorised**; UI refinement is paused; the homework feature-branch and pull-request exercise (footer change, PR #1) is **done and merged**; do not repeat it or create further branches or pull requests unless explicitly requested. Verification is intentionally proportionate to a homework prototype: do not expand testing to every edge case without a new instruction. If asked to continue verification, the most valuable untested item is one run of the full-assessment review path on Railway (see 0.1).
 
 ## 1. Authoritative documents and where decisions live
 
