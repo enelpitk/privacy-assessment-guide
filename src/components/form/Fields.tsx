@@ -129,8 +129,6 @@ export function FieldBlock({
   // In the submitted screening view the answers are shown plainly: no comment links and no read-only line.
   // Access control is unchanged; this only hides those elements.
   const screeningLocked = isScreeningLock(perm);
-  // Some pages (for example 1.1) show no comment links at all.
-  const commentsOff = screeningLocked || Boolean(subsectionById.get(subsectionId)?.noComments);
   const mode = subsectionById.get(subsectionId)?.answerControls ?? "field";
   const inputId = `${uid}-in`;
   const helpId = `${uid}-help`;
@@ -144,7 +142,7 @@ export function FieldBlock({
         <HelpRequest def={def} recordId={recordId} disabled={disabled} />
         {f?.status === "conflict" ? <ConflictPanel def={def} f={f} recordId={recordId} /> : null}
         <FieldMeta f={f} />
-        {commentsOff ? null : <FieldComments subsectionId={subsectionId} fieldId={def.id} recordId={recordId} />}
+        {screeningLocked ? null : <FieldComments subsectionId={subsectionId} fieldId={def.id} recordId={recordId} />}
       </div>
     );
   }
@@ -365,7 +363,6 @@ export function FieldBlock({
       ) : null}
       {f?.status === "conflict" ? <ConflictPanel def={def} f={f} recordId={recordId} /> : null}
       <FieldMeta f={f} />
-      {commentsOff ? null : <FieldComments subsectionId={subsectionId} fieldId={def.id} recordId={recordId} />}
       {!perm.ok && !screeningLocked ? <p className="help-text mt-1">Read-only: {perm.reason}</p> : null}
     </>
   );

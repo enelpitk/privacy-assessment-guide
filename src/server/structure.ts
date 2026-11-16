@@ -13,6 +13,7 @@ export async function createRecord(
   assessmentId: string,
   collectionId: string,
   parentId: string | null,
+  options: { onlyIfEmpty?: boolean } = {},
 ) {
   const { ctx, versionId } = await loadAccessible(user, assessmentId);
   const loc = collectionIndex.get(collectionId);
@@ -30,6 +31,14 @@ export async function createRecord(
     throw new HttpError(400, "This list has no parent.");
   }
 
+  if (options.onlyIfEmpty) {
+    // Used when a list opens with its first entry: if an entry already exists, return it instead of creating another.
+    const existing = await prisma.recordItem.findFirst({
+      where: { versionId, collection: collectionId, parentId: parentId ?? null, deletedAt: null },
+      orderBy: { ordering: "asc" },
+    });
+    if (existing) return { id: existing.id, collection: existing.collection, parentId: existing.parentId, ordering: existing.ordering, revision: existing.revision };
+  }
   const last = await prisma.recordItem.findFirst({
     where: { versionId, collection: collectionId, parentId: parentId ?? null },
     orderBy: { ordering: "desc" },

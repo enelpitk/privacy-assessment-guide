@@ -231,7 +231,8 @@ describe("2.1 Controllers", () => {
     expect(html).toContain("Controller 1");
     expect(html).toContain(">Select<");
     expect(html).toContain("Roles and responsibilities");
-    expect(html).toContain("+ Add a new Controller");
+    expect(html).toContain("+ Add Controller");
+    expect(html).not.toContain("+ Add a new Controller");
     expect(html).toContain("Harbour Insurance");
     expect(html).toContain("Harbour Asset Management");
     expect(html).toContain("Harbour Bank");
@@ -266,7 +267,7 @@ describe("2.1 Controllers", () => {
   it("puts the single help request after all controller records and the add control", () => {
     const html = render("B1", page()).replace(/<!-- -->/g, "");
     const help = html.indexOf("Not sure – I need help");
-    expect(help).toBeGreaterThan(html.indexOf("+ Add a new Controller"));
+    expect(help).toBeGreaterThan(html.indexOf("+ Add Controller"));
     expect(help).toBeGreaterThan(html.indexOf("Roles and responsibilities"));
     expect(help).toBeLessThan(html.indexOf("Save draft"));
     expect(html.match(/Not sure – I need help/g)).toHaveLength(1);

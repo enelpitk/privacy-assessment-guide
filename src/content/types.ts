@@ -110,6 +110,8 @@ export interface CollectionDef {
   collapsible?: boolean;
   /** One expandable "Guidance" shown inside each record. */
   guidance?: string;
+  /** Top-level list that opens with its first entry already present (created once if the list is empty and the user may edit). */
+  startWithOne?: boolean;
 }
 
 export type InfoBlock =
@@ -166,8 +168,6 @@ export interface SubsectionDef {
   noAbout?: boolean;
   /** With noAbout: show the text of the "About this section" panel as a collapsed "Guidance" under the section heading instead. */
   guidanceInsteadOfAbout?: boolean;
-  /** Do not show the per-question "Comment" links and "Comments on this section" on this page. Display only: stored comments and permissions are unchanged. */
-  noComments?: boolean;
 }
 
 export interface StageDef {

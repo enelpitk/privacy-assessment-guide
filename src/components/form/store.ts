@@ -360,6 +360,19 @@ export class AssessmentStore {
     return { id: rec.id };
   }
 
+  /** Opens a list with its first entry: creates one only if the list is empty (the server returns an existing entry instead of adding a second). */
+  async ensureFirstRecord(collection: string): Promise<string | null> {
+    if (this.records.some((r) => r.collection === collection && r.parentId === null)) return null;
+    const res = await call<ClientRecord>("POST", `/api/assessments/${this.assessmentId}/records`, { collection, parentId: null, onlyIfEmpty: true });
+    if (!res.ok) return res.data.error ?? "Could not add the entry.";
+    const rec = res.data as ClientRecord;
+    if (!this.records.some((r) => r.id === rec.id)) {
+      this.records = [...this.records, rec];
+      this.emit();
+    }
+    return null;
+  }
+
   async addRecord(collection: string, parentId: string | null): Promise<string | null> {
     const r = await this.addRecordId(collection, parentId);
     return r.error ?? null;

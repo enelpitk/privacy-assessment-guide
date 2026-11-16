@@ -4,6 +4,7 @@ import { CollabProvider } from "@/components/form/collab";
 import { StoreCtx } from "@/components/form/context";
 import { AssessmentStore } from "@/components/form/store";
 import { SubsectionForm } from "@/components/form/SubsectionForm";
+import { subsectionById } from "@/content";
 import { SCREENING_LOCK_REASON, canEditField, isScreeningLock } from "@/domain/permissions";
 import type { AccessCtx } from "@/domain/permissions";
 import type { PageData } from "@/lib/types";
@@ -68,49 +69,32 @@ describe("submitted screening view: comment links and lock messages are hidden",
   });
 });
 
-describe("other states keep their comment links and read-only messages", () => {
-  it("before the screening is submitted the owner can edit and comments are shown", () => {
+describe("other states keep their read-only messages (the questionnaire shows no comment blocks in any of them)", () => {
+  it("before the screening is submitted the owner can edit and no read-only line is shown", () => {
     const h = html("C1", page("owner", { lifecycle: "DRAFT", screeningStatus: "NOT_SUBMITTED" }));
-    expect(hasQuestionComment(h)).toBe(true);
-    expect(hasSectionComments(h)).toBe(true);
     expect(h).not.toContain("Read-only:");
+    expect(hasSectionComments(h)).toBe(false);
   });
-  it("sections after the screening (4 to 11) stay editable and commentable while the screening awaits the DPO", () => {
+  it("sections after the screening (4 to 11) stay editable while the screening awaits the DPO", () => {
     const h = html("D1", page("owner", submitted));
-    expect(hasQuestionComment(h)).toBe(true);
-    expect(hasSectionComments(h)).toBe(true);
     expect(h).not.toContain("Read-only:");
   });
-  it("the DPO keeps the comment links and the 'DPOs read and comment' message on submitted screening sections", () => {
+  it("the DPO keeps the 'DPOs read and comment' message on submitted screening sections", () => {
     const h = html("C1", page("dpo", submitted));
-    expect(hasQuestionComment(h)).toBe(true);
-    expect(hasSectionComments(h)).toBe(true);
     expect(h).toContain("DPO users read and comment");
   });
-  it("a contributor assigned elsewhere keeps the assignment message and the comment links on a screening section not assigned to them", () => {
+  it("a contributor assigned elsewhere keeps the assignment message on a screening section not assigned to them", () => {
     const p = page("assignee", submitted);
     const other = { ...p, ctx: { ...p.ctx, assignedSubsections: ["D1"] } };
-    const h = html("C1", other);
-    expect(h).toContain("You can edit only subsections assigned to you.");
-    expect(hasQuestionComment(h)).toBe(true);
-    expect(hasSectionComments(h)).toBe(true);
+    expect(html("C1", other)).toContain("You can edit only subsections assigned to you.");
   });
-  it("during the DPO review the owner still sees the review-state lock message and the comment links", () => {
+  it("during the DPO review the owner still sees the review-state lock message", () => {
     const h = html("C1", page("owner", { lifecycle: "IN_DPO_REVIEW", screeningStatus: "DECIDED" }));
-    expect(hasQuestionComment(h)).toBe(true);
-    expect(hasSectionComments(h)).toBe(true);
     expect(h).toContain("Substantive editing is locked in the current review state.");
   });
-  it("an archived assessment still shows its read-only message, and stored comments stay reachable", () => {
-    const p = page("owner", { lifecycle: "ARCHIVED", screeningStatus: "DECIDED" });
-    const h = html("C1", { ...p, threads: [thread] });
+  it("an archived assessment still shows its read-only message", () => {
+    const h = html("C1", page("owner", { lifecycle: "ARCHIVED", screeningStatus: "DECIDED" }));
     expect(h).toContain("Archived assessments are read-only.");
-    expect(h).toContain("Comments on this section (1, 1 open)");
-  });
-  it("an existing comment thread on a submitted screening section is not deleted or altered: it stays in the data and is shown to a viewer who can comment (the DPO)", () => {
-    const p = { ...page("dpo", submitted), threads: [thread] };
-    expect(html("C1", p)).toContain("Comments on this section (1, 1 open)");
-    expect(p.threads).toHaveLength(1); // the view change only hides links; it does not touch stored threads
   });
 });
 
@@ -155,7 +139,7 @@ describe("owner-only hint: how to change locked screening answers", () => {
   });
 });
 
-describe("1.1 Processing and 1.2 Reason show no comment blocks (display only)", () => {
+describe("the questionnaire shows no comment UI (display only); the help request keeps its own thread link", () => {
   const thread = {
     id: "t1",
     subsectionId: "A1",
@@ -164,32 +148,39 @@ describe("1.1 Processing and 1.2 Reason show no comment blocks (display only)", 
     state: "OPEN" as const,
     comments: [{ id: "c1", authorName: "Dana Whitfield", authorId: "d1", body: "A comment.", createdAt: "2026-11-08T10:00:00.000Z", parentId: null, isReview: true }],
   };
-  it("the owner sees no 'Comment' links and no 'Comments on this section' on 1.1 in an editable draft", () => {
-    const h = html("A1", page("owner", { lifecycle: "DRAFT", screeningStatus: "NOT_SUBMITTED" }));
-    expect(hasQuestionComment(h)).toBe(false);
-    expect(hasSectionComments(h)).toBe(false);
-    expect(h).toContain("Name of the processing"); // the answers stay
+  const ctx = { lifecycle: "DRAFT" as const, screeningStatus: "NOT_SUBMITTED" as const };
+  // Sections without a "Not sure - I need help" request show no Comment links at all.
+  const SAMPLE = ["A1", "A2", "C0", "C1", "C2", "C5", "D1", "E1", "F1", "G1", "H1", "I1", "J1", "J2", "K2", "K3", "K7"];
+
+  it("the sampled section ids are real sections (so the checks below are not vacuous)", () => {
+    for (const sub of SAMPLE) expect(subsectionById.has(sub), sub).toBe(true);
   });
-  it("the DPO and a contributor see none on 1.1 either, even when a thread exists (it stays stored, only the link is not shown)", () => {
-    const dpo = { ...page("dpo", { lifecycle: "DRAFT", screeningStatus: "NOT_SUBMITTED" }), threads: [thread] };
-    expect(hasSectionComments(html("A1", dpo))).toBe(false);
-    expect(hasQuestionComment(html("A1", page("assignee", { lifecycle: "DRAFT", screeningStatus: "NOT_SUBMITTED" })))).toBe(false);
-    expect(dpo.threads).toHaveLength(1);
-  });
-  it("1.2 Reason for the assessment shows no comment links and no section comments for the owner, the DPO or a contributor", () => {
-    const ctx = { lifecycle: "DRAFT" as const, screeningStatus: "NOT_SUBMITTED" as const };
-    for (const who of ["owner", "dpo", "assignee"] as const) {
-      const h = html("A2", page(who, ctx));
-      expect(hasQuestionComment(h), who).toBe(false);
-      expect(hasSectionComments(h), who).toBe(false);
+  it("no per-field 'Comment' link and no 'Comments on this section' block appears in any sampled section for the owner, the DPO or a contributor", () => {
+    for (const sub of SAMPLE) {
+      for (const who of ["owner", "dpo", "assignee"] as const) {
+        const h = html(sub, page(who, ctx));
+        expect(hasQuestionComment(h), `${sub} ${who}`).toBe(false);
+        expect(hasSectionComments(h), `${sub} ${who}`).toBe(false);
+      }
     }
-    expect(html("A2", page("owner", ctx))).toContain("Reason for the DPIA"); // the answers stay
   });
-  it("other pages keep their comment blocks (2.1 and 3.2) while editable", () => {
-    for (const sub of ["B1", "C1"]) {
-      const h = html(sub, page("owner", { lifecycle: "DRAFT", screeningStatus: "NOT_SUBMITTED" }));
-      expect(hasQuestionComment(h), sub).toBe(true);
-      expect(hasSectionComments(h), sub).toBe(true);
+  it("the answers stay visible in those sections", () => {
+    expect(html("A1", page("owner", ctx))).toContain("Name of the processing");
+    expect(html("A2", page("owner", ctx))).toContain("Reason for the DPIA");
+  });
+  it("stored comment threads are not deleted or altered: they remain in the page data, only the UI is not shown", () => {
+    const p = { ...page("dpo", ctx), threads: [thread] };
+    const h = html("A1", p);
+    expect(hasSectionComments(h)).toBe(false);
+    expect(h).not.toContain("Comments on this section (1");
+    expect(p.threads).toHaveLength(1);
+  });
+  it("sections with a 'Not sure - I need help' request keep that request and its own thread link (2.1 and 2.2)", () => {
+    for (const sub of ["B1", "B2"]) {
+      const h = html(sub, page("owner", ctx));
+      expect(h, sub).toContain("Not sure – I need help");
+      expect(hasSectionComments(h), sub).toBe(false);
+      expect((h.match(/>Comment</g) ?? []).length, sub).toBe(1); // only the help request's thread link
     }
   });
 });

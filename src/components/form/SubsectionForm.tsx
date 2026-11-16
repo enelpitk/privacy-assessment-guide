@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   STAGES,
   SUBSECTIONS,
@@ -28,7 +28,6 @@ import { isEmptyValue } from "@/domain/validation";
 import { fieldKey } from "@/lib/types";
 import { useStoreCtx, useStoreRev } from "./context";
 import { FieldBlock, useFormat } from "./Fields";
-import { SectionComments } from "./Comments";
 import { GovStatus } from "./Governance";
 import { postAction, useCollab } from "./collab";
 import { ConsultFlag, RiskExamplesPicker, RiskSummary } from "./Risk";
@@ -113,7 +112,6 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
           <Items items={sub.items} recordId="" subsectionId={sub.id} evalCtx={model.ctx} />
         </form>
 
-        {screeningLocked || sub.noComments ? null : <SectionComments subsectionId={sub.id} />}
         <nav className="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4" aria-label="Section navigation">
           {prev ? (
             <a
@@ -287,6 +285,18 @@ function CollectionEditor({
   const recs = recordsFor(rows, col.id, parentRecordId === "" ? null : parentRecordId);
   const perm = canChangeRecords(page.actor, page.ctx, subsectionId);
   const nested = parentRecordId !== "";
+
+  // A list that opens with its first entry (for example 2.1 Controllers): create it once if the list is empty and the user may edit.
+  // The server returns an existing entry instead of adding a second one, and this runs at most once per time the section is opened.
+  const started = useRef(false);
+  const mustStart = Boolean(col.startWithOne) && !nested && !col.workflow && perm.ok && recs.length === 0;
+  useEffect(() => {
+    if (!mustStart || started.current) return;
+    started.current = true;
+    void store.ensureFirstRecord(col.id).then((err) => {
+      if (err) setMsg(err);
+    });
+  }, [mustStart, store, col.id]);
 
   if (col.workflow) return null; // recorded in Review and decisions
 

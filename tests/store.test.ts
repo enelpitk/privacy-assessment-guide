@@ -193,3 +193,35 @@ describe("screening suggestion snapshots", () => {
   });
 });
 
+describe("opening a list with its first entry", () => {
+  it("asks the server to add the first entry only if the list is empty, and never adds the same entry twice", async () => {
+    const fn = mockFetch(() => ({ id: "rec1", collection: "B.ctrl", parentId: null, ordering: 0, revision: 1 }));
+    const store = new AssessmentStore(pageStub());
+    expect(await store.ensureFirstRecord("B.ctrl")).toBeNull();
+    expect(store.records.filter((r) => r.collection === "B.ctrl")).toHaveLength(1);
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(JSON.parse((fn.mock.calls[0][1] as RequestInit).body as string)).toMatchObject({ collection: "B.ctrl", parentId: null, onlyIfEmpty: true });
+    // already present: no request at all
+    expect(await store.ensureFirstRecord("B.ctrl")).toBeNull();
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("does nothing when the page already has an entry, and does not duplicate when the server returns an entry the page already shows", async () => {
+    const fn = mockFetch(() => ({ id: "c1", collection: "B.ctrl", parentId: null, ordering: 0, revision: 1 }));
+    const withRecord = new AssessmentStore(pageStub({ records: [{ id: "c1", collection: "B.ctrl", parentId: null, ordering: 0, revision: 1 }] }));
+    expect(await withRecord.ensureFirstRecord("B.ctrl")).toBeNull();
+    expect(fn).not.toHaveBeenCalled();
+    // another tab created the entry meanwhile: the server returns it and the page must not list it twice
+    const other = new AssessmentStore(pageStub());
+    await other.ensureFirstRecord("B.ctrl");
+    await other.ensureFirstRecord("B.ctrl");
+    expect(other.records.filter((r) => r.id === "c1")).toHaveLength(1);
+  });
+
+  it("reports an error and adds nothing when the server refuses", async () => {
+    mockFetch(() => ({ error: "Not allowed" }), 403);
+    const store = new AssessmentStore(pageStub());
+    expect(await store.ensureFirstRecord("B.ctrl")).toContain("Not allowed");
+    expect(store.records).toHaveLength(0);
+  });
+});

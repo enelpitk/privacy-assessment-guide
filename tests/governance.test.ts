@@ -10,6 +10,7 @@ import { collectionIndex, fieldIndex } from "@/content";
 import { buildModel, evaluateAssessment } from "@/domain/model";
 import { createAssessment } from "@/server/assessments";
 import { runAction } from "@/server/governance";
+import { createRecord } from "@/server/structure";
 import { loadGovernance } from "@/server/governanceData";
 import { saveChanges } from "@/server/save";
 import { HttpError } from "@/lib/errors";
@@ -394,6 +395,46 @@ describe("reopening a decided screening (reproduction of the owner's report)", (
     expect(await status(act(dpo1, { action: "reopenScreening" }))).toBe(403);
     expect(await status(act(contrib, { action: "reopenScreening" }))).toBe(404);
     expect(A().screeningStatus).toBe("DECIDED");
+  });
+});
+
+describe("2.1 Controllers opens with its first entry (no duplicates)", () => {
+  const live = () => table("recordItem").filter((r) => r.collection === "B.ctrl" && !r.deletedAt);
+
+  it("creating the first entry on opening adds exactly one, and repeating it returns the same entry instead of a second", async () => {
+    const first = await createRecord(owner, id, "B.ctrl", null, { onlyIfEmpty: true });
+    expect(live()).toHaveLength(1);
+    const again = await createRecord(owner, id, "B.ctrl", null, { onlyIfEmpty: true });
+    expect(again.id).toBe(first.id);
+    expect(live()).toHaveLength(1);
+  });
+
+  it("an existing controller is kept as it is: no second entry is created and its answers are untouched", async () => {
+    const versionId = A().currentVersionId;
+    table("recordItem").push({ id: "ctrlA", versionId, collection: "B.ctrl", parentId: null, ordering: 0, revision: 1, deletedAt: null, createdById: "o1" });
+    setAnswer("B.ctrl.role", "Existing roles text", "ctrlA");
+    const r = await createRecord(owner, id, "B.ctrl", null, { onlyIfEmpty: true });
+    expect(r.id).toBe("ctrlA");
+    expect(live()).toHaveLength(1);
+    expect(table("responseField").find((f) => f.fieldId === "B.ctrl.role" && f.recordId === "ctrlA")?.value).toBe("Existing roles text");
+  });
+
+  it("'+ Add Controller' (a normal add) still adds another entry without replacing the first", async () => {
+    const first = await createRecord(owner, id, "B.ctrl", null, { onlyIfEmpty: true });
+    const second = await createRecord(owner, id, "B.ctrl", null);
+    expect(second.id).not.toBe(first.id);
+    expect(live().map((r) => r.id).sort()).toEqual([first.id, second.id].sort());
+    expect(live().find((r) => r.id === second.id)!.ordering).toBe(live().find((r) => r.id === first.id)!.ordering + 1);
+  });
+
+  it("the entry is created only for someone who may edit: not for the DPO, an unassigned contributor, or a locked submitted screening", async () => {
+    await expect(createRecord(dpo1, id, "B.ctrl", null, { onlyIfEmpty: true })).rejects.toMatchObject({ status: 403 });
+    await expect(createRecord(contrib, id, "B.ctrl", null, { onlyIfEmpty: true })).rejects.toMatchObject({ status: 404 });
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    const before = live().length;
+    await expect(createRecord(owner, id, "B.ctrl", null, { onlyIfEmpty: true })).rejects.toMatchObject({ status: 403 });
+    expect(live()).toHaveLength(before);
   });
 });
 

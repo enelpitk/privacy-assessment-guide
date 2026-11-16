@@ -35,7 +35,6 @@ export const STAGE_A: StageDef = {
       stage: "A",
       title: "Processing",
       summary: "Name and a short description of the processing.",
-      noComments: true,
       intro:
         "A DPIA helps assess whether the processing of personal data is necessary and proportionate, and identifies potential risks to individuals’ rights and freedoms.",
       answerControls: "none",
@@ -88,7 +87,6 @@ export const STAGE_A: StageDef = {
       answerControls: "none",
       noAbout: true,
       guidanceInsteadOfAbout: true,
-      noComments: true,
       items: [
         multi(
           "A.reason",
@@ -161,7 +159,8 @@ export const STAGE_B: StageDef = {
             min: 1,
             compact: true,
             titleField: "B.ctrl.name",
-            addLabel: "+ Add a new Controller",
+            addLabel: "+ Add Controller",
+            startWithOne: true,
             guidance:
               "A controller is an entity of the group that decides why and how personal data is processed. If two or more entities jointly decide, they are joint controllers: add a controller record for each of them and describe their respective roles and responsibilities. If there are no joint controllers, add only the one controller.",
           },
