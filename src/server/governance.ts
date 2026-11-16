@@ -189,8 +189,10 @@ async function reopenScreening(user: CurrentUser, l: Loaded) {
   await prisma.$transaction(async (tx) => {
     // Earlier decisions and opinions stay in the history; the decision is marked as superseded.
     await tx.screeningDecision.updateMany({ where: { assessmentId: l.assessment.id, versionId: l.versionId, supersededAt: null }, data: { supersededAt: new Date() } });
+    // Name the submission whose decision is being superseded so history can mark it. The snapshot itself is never touched.
+    const decided = await tx.snapshot.findFirst({ where: { assessmentId: l.assessment.id, versionId: l.versionId, kind: "SCREENING_SUBMITTED" }, orderBy: { takenAt: "desc" } });
     await applyPatch(tx, l, patchFor("reopenScreening", l.state));
-    await event(tx, l, user.id, "SCREENING_REOPENED", { previousPath: l.state.path });
+    await event(tx, l, user.id, "SCREENING_REOPENED", { previousPath: l.state.path, snapshotId: decided?.id ?? null });
   });
   return {};
 }

@@ -111,6 +111,20 @@ Observations (both since corrected in code and covered by local tests, **not yet
 - On the version 2.0 Review page the earlier version's screening decision, DPO opinion and "Approved" owner decision are listed under the draft revision without a version label. The status above them says Draft / Screening not submitted, but a reader could take "Approved" as applying to 2.0.
 - The Stage 3 test assessment was not touched.
 
+## Stage 4 verification on Railway: Test 3, screening withdrawal changes (built-in browser, performed 2026-11-16, commit `74c8d03`)
+
+Scope: the owner hint, the withdrawn / resubmitted labelling and the DPO decision bound to the reviewed snapshot. A local app could not be used (no local database; the project rules forbid installing one), so this ran on Railway after deploying `74c8d03` (`/api/health`: app ok, database ok, commit `74c8d03`). A new fictional assessment, "TEST Stage 4b withdrawal verification (fictional)" (id `cmwjfeqby0001mo1v1v0rcg8m`), was created for this test only (Retail Banking, DPO Dana Whitfield, a staff-training attendance register with honest "No" screening answers). No other assessment was touched. It is submitted, so it is archive-only and is **retained**.
+
+| # | Step | Result | Observed |
+|---|---|---|---|
+| 1 | Owner opens a submitted screening section (2.1) while the screening awaits the DPO | Pass | Hint "The screening is with the DPO. To change these answers, withdraw it for editing on Review and decisions." with link `/assessments/<id>/review`; no lock notice, no Comment links; fields disabled. The link opened Review and decisions, which showed "Withdraw for editing". |
+| 2 | Withdraw, then edit | Pass | Review showed "Withdrawn for editing on … not decided … kept as history … no longer under review" and "Screening indications at the withdrawn submission"; status "Screening not submitted"; the questionnaire fields became editable and an edit saved (present after reload). History and the snapshot page labelled snapshot 1 as withdrawn; its page-content hash was identical before and after (`470df0b5698ccb4c`). |
+| 3 | Submit again | Pass | A new snapshot was created; Review said "New submission. The earlier submission was withdrawn… Only this submission is under review" with a link to the withdrawn one; History and the snapshot pages showed both relationships; the first snapshot said it was replaced by a later submission. |
+| 4 | Stale DPO decision | Pass | A DPO page loaded on submission 2 was kept open; the owner withdrew and resubmitted (submission 3); recording a decision on the old page was refused with "The submission you reviewed is no longer the current one: it was withdrawn or replaced by a newer submission. Reload the page and review the current submission before recording a decision." and no decision was recorded. |
+| 5 | Reload and decide | Pass | After reload the DPO saw the current submission ("New submission…"), recorded "Proceed to full assessment", and the screening became "Screening decided", path "Full assessment". The earlier snapshots kept their content hashes (`470df0b5698ccb4c`, `5d1182aaa809b453`). |
+
+Limits: one browser pane shares the demo-identity cookie, so the "separate DPO session" was emulated by keeping the DPO's page open in one tab while the owner's actions ran in another tab; the request used whichever identity was current at the click (the DPO). The browser blocks native confirmation dialogs, so confirmations were accepted by script. Older withdrawal events without a snapshot id (the "matched by time" path) were covered by local tests only, because every withdrawal here was recorded after the change. Server-side refusal of other denied actions remains untested on Railway.
+
 ## Stage 4 items that specifically need Railway verification
 
 - Migration `20261108000000_stage4_governance` applies cleanly at startup on the existing database and keeps all existing assessments and answers (the test assessment included).

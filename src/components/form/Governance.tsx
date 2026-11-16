@@ -7,6 +7,7 @@ import type { GovernanceData } from "@/lib/govTypes";
 import { lifecycleLabel, SCREENING_LABEL } from "@/lib/labels";
 import { NON_ASSIGNABLE } from "@/server/assignable";
 import { ScreeningSubmissionNote } from "@/components/ScreeningSubmissionNote";
+import { pressAction, pressCancel, pressYes } from "./confirmFlow";
 import { useStoreCtx } from "./context";
 import { formatTime } from "./Fields";
 import { useCollab, useRunner } from "./collab";
@@ -55,7 +56,27 @@ function TextArea({ label, value, onChange, rows = 3 }: { label: string; value: 
   );
 }
 
-/** A button that runs an action and shows the outcome. Flushes pending answer saves first. */
+/**
+ * The in-page confirmation step. It replaces the browser's own confirm() dialog, which some browsers block or hide
+ * (an action behind a blocked dialog silently does nothing).
+ */
+export function InlineConfirm({ message, onYes, onCancel }: { message: string; onYes: () => void; onCancel: () => void }) {
+  return (
+    <div role="group" aria-label="Confirm this action" className="mt-2 max-w-prose2 rounded border border-amber-300 bg-amber-50 p-2 text-amber-950" data-testid="inline-confirm">
+      <p>{message}</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <button type="button" className="btn-primary" onClick={onYes}>
+          Yes, continue
+        </button>
+        <button type="button" className="btn-secondary" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** A button that runs an action and shows the outcome. Flushes pending answer saves first. A confirmation is asked in the page. */
 function Do({
   body,
   children,
@@ -76,33 +97,50 @@ function Do({
   const { page, store } = useStoreCtx();
   const run = useRunner(page.assessment.id);
   const [busy, setBusy] = useState(false);
+  const [asking, setAsking] = useState(false);
   const [err, setErr] = useState<{ msg: string; items?: string[] } | null>(null);
+  const go = async () => {
+    setBusy(true);
+    setErr(null);
+    const ok = await store.flush();
+    if (!ok) {
+      setBusy(false);
+      return setErr({ msg: "Some answers could not be saved yet. Resolve that first, then try again." });
+    }
+    const r = await run(body, { refresh: !onDone });
+    setBusy(false);
+    if (r.error) {
+      const det = Array.isArray(r.data.details) ? (r.data.details as { label?: string; reason?: string }[]).map((d) => (typeof d === "string" ? d : `${d.label ?? ""}: ${d.reason ?? ""}`)) : undefined;
+      return setErr({ msg: r.error, items: det });
+    }
+    onDone?.(r.data);
+  };
   return (
     <div className="inline-block">
       <button
         type="button"
         className={danger ? "btn-danger" : primary ? "btn-primary" : "btn-secondary"}
         disabled={busy || disabled}
-        onClick={async () => {
-          if (confirm && !window.confirm(confirm)) return;
-          setBusy(true);
-          setErr(null);
-          const ok = await store.flush();
-          if (!ok) {
-            setBusy(false);
-            return setErr({ msg: "Some answers could not be saved yet. Resolve that first, then try again." });
-          }
-          const r = await run(body, { refresh: !onDone });
-          setBusy(false);
-          if (r.error) {
-            const det = Array.isArray(r.data.details) ? (r.data.details as { label?: string; reason?: string }[]).map((d) => (typeof d === "string" ? d : `${d.label ?? ""}: ${d.reason ?? ""}`)) : undefined;
-            return setErr({ msg: r.error, items: det });
-          }
-          onDone?.(r.data);
+        onClick={() => {
+          const step = pressAction(asking, Boolean(confirm));
+          if (confirm) setErr(null);
+          setAsking(step.asking);
+          if (step.run) void go();
         }}
       >
         {busy ? "Working…" : children}
       </button>
+      {asking && confirm ? (
+        <InlineConfirm
+          message={confirm}
+          onYes={() => {
+            const step = pressYes(asking);
+            setAsking(step.asking);
+            if (step.run) void go();
+          }}
+          onCancel={() => setAsking(pressCancel().asking)}
+        />
+      ) : null}
       {err ? (
         <div className="mt-2 max-w-prose2">
           <Err msg={err.msg} items={err.items} />
@@ -199,7 +237,7 @@ function ScreeningCard({ gov }: { gov: GovernanceData }) {
     <Card title="Gate 1: screening review (pre-assessment)">
       {gov.screening ? (
         <p>
-          {currentSubmission?.screeningSubmission?.withdrawn && s.screeningStatus !== "AWAITING_DPO" ? "Screening indications at the withdrawn submission" : "Screening indications at submission"}:{" "}
+          {(currentSubmission?.screeningSubmission?.withdrawn || currentSubmission?.screeningSubmission?.reopened) && s.screeningStatus !== "AWAITING_DPO" && s.screeningStatus !== "DECIDED" ? `Screening indications at the ${currentSubmission?.screeningSubmission?.reopened ? "superseded" : "withdrawn"} submission` : "Screening indications at submission"}:{" "}
           <strong>{gov.screening.fullDpiaIndicated ? "Full DPIA indicated" : "no full DPIA indication"}</strong>;{" "}
           <strong>{gov.screening.tiaIndicated ? "TIA follow-up indicated" : "no TIA follow-up indicated"}</strong>
           {gov.screening.unresolved.length ? `; ${gov.screening.unresolved.length} screening question(s) unresolved` : ""}. These are indications under the template rules, not conclusions.

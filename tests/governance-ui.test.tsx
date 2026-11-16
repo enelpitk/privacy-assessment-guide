@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -5,7 +7,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined, r
 
 import { CollabProvider } from "@/components/form/collab";
 import { StoreCtx } from "@/components/form/context";
-import { HistoryPanel, ReviewPanel, TeamPanel } from "@/components/form/Governance";
+import { HistoryPanel, InlineConfirm, ReviewPanel, TeamPanel } from "@/components/form/Governance";
 import { AssessmentStore } from "@/components/form/store";
 import type { GovernanceData } from "@/lib/govTypes";
 import type { PageData } from "@/lib/types";
@@ -189,7 +191,7 @@ describe("review screen shows the right actions to the right role", () => {
     expect(cur).not.toContain("earlier version, historical");
   });
   it("withdrawn screening submission: Review and decisions says it was withdrawn and that the next submission is new; the DPO sees no decision form", () => {
-    const snaps = [{ id: "s1", kind: "SCREENING_SUBMITTED", versionNumber: "1.0", takenAt: "2026-11-08T10:00:00.000Z", takenByName: "Alex Rowan", hash: "abc", screeningSubmission: { withdrawn: true, withdrawnAt: "2026-11-08T11:00:00.000Z", replacedBySnapshotId: null, resubmissionOfSnapshotId: null, resubmissionOfWithdrawnAt: null, exact: true } }];
+    const snaps = [{ id: "s1", kind: "SCREENING_SUBMITTED", versionNumber: "1.0", takenAt: "2026-11-08T10:00:00.000Z", takenByName: "Alex Rowan", hash: "abc", screeningSubmission: { withdrawn: true, withdrawnAt: "2026-11-08T11:00:00.000Z", reopened: false, reopenedAt: null, replacedBySnapshotId: null, resubmissionOfSnapshotId: null, resubmissionAfter: null, resubmissionOfEndedAt: null, exact: true } }];
     const g = gov({ snapshots: snaps, screening: { fullDpiaIndicated: false, tiaIndicated: false, unresolved: [], snapshotId: "s1" }, state: { ...gov().state, screeningStatus: "NOT_SUBMITTED" } });
     const html = review("owner", g, { screeningStatus: "NOT_SUBMITTED" });
     expect(html).toContain("Withdrawn for editing on");
@@ -199,8 +201,8 @@ describe("review screen shows the right actions to the right role", () => {
     expect(review("dpo", g, { screeningStatus: "NOT_SUBMITTED" })).not.toContain("Record screening decision");
   });
   it("resubmission: the awaiting-DPO view says this is a new submission and links the withdrawn one; History shows both relationships", () => {
-    const w = { withdrawn: true, withdrawnAt: "2026-11-08T11:00:00.000Z", replacedBySnapshotId: "s2", resubmissionOfSnapshotId: null, resubmissionOfWithdrawnAt: null, exact: true };
-    const n = { withdrawn: false, withdrawnAt: null, replacedBySnapshotId: null, resubmissionOfSnapshotId: "s1", resubmissionOfWithdrawnAt: "2026-11-08T11:00:00.000Z", exact: true };
+    const w = { withdrawn: true, withdrawnAt: "2026-11-08T11:00:00.000Z", reopened: false, reopenedAt: null, replacedBySnapshotId: "s2", resubmissionOfSnapshotId: null, resubmissionAfter: null, resubmissionOfEndedAt: null, exact: true };
+    const n = { withdrawn: false, withdrawnAt: null, reopened: false, reopenedAt: null, replacedBySnapshotId: null, resubmissionOfSnapshotId: "s1", resubmissionAfter: "WITHDRAWN" as const, resubmissionOfEndedAt: "2026-11-08T11:00:00.000Z", exact: true };
     const snaps = [
       { id: "s1", kind: "SCREENING_SUBMITTED", versionNumber: "1.0", takenAt: "2026-11-08T10:00:00.000Z", takenByName: "Alex Rowan", hash: "aaa", screeningSubmission: w },
       { id: "s2", kind: "SCREENING_SUBMITTED", versionNumber: "1.0", takenAt: "2026-11-08T12:00:00.000Z", takenByName: "Alex Rowan", hash: "bbb", screeningSubmission: n },
@@ -216,15 +218,64 @@ describe("review screen shows the right actions to the right role", () => {
     expect(hist).toContain("New submission.");
   });
   it("an older withdrawal that does not name the submission is still shown, with a note that it was matched by time", () => {
-    const snaps = [{ id: "s1", kind: "SCREENING_SUBMITTED", versionNumber: "1.0", takenAt: "2026-11-08T10:00:00.000Z", takenByName: "Alex Rowan", hash: "abc", screeningSubmission: { withdrawn: true, withdrawnAt: "2026-11-08T11:00:00.000Z", replacedBySnapshotId: null, resubmissionOfSnapshotId: null, resubmissionOfWithdrawnAt: null, exact: false } }];
+    const snaps = [{ id: "s1", kind: "SCREENING_SUBMITTED", versionNumber: "1.0", takenAt: "2026-11-08T10:00:00.000Z", takenByName: "Alex Rowan", hash: "abc", screeningSubmission: { withdrawn: true, withdrawnAt: "2026-11-08T11:00:00.000Z", reopened: false, reopenedAt: null, replacedBySnapshotId: null, resubmissionOfSnapshotId: null, resubmissionAfter: null, resubmissionOfEndedAt: null, exact: false } }];
     const html = history("owner", gov({ snapshots: snaps }));
     expect(html).toContain("Withdrawn for editing on");
     expect(html).toContain("Matched by time");
   });
   it("an ordinary submitted screening shows no withdrawal note", () => {
-    const snaps = [{ id: "s1", kind: "SCREENING_SUBMITTED", versionNumber: "1.0", takenAt: "2026-11-08T10:00:00.000Z", takenByName: "Alex Rowan", hash: "abc", screeningSubmission: { withdrawn: false, withdrawnAt: null, replacedBySnapshotId: null, resubmissionOfSnapshotId: null, resubmissionOfWithdrawnAt: null, exact: false } }];
+    const snaps = [{ id: "s1", kind: "SCREENING_SUBMITTED", versionNumber: "1.0", takenAt: "2026-11-08T10:00:00.000Z", takenByName: "Alex Rowan", hash: "abc", screeningSubmission: { withdrawn: false, withdrawnAt: null, reopened: false, reopenedAt: null, replacedBySnapshotId: null, resubmissionOfSnapshotId: null, resubmissionAfter: null, resubmissionOfEndedAt: null, exact: false } }];
     expect(history("owner", gov({ snapshots: snaps }))).not.toContain("Withdrawn for editing on");
     expect(history("owner", gov({ snapshots: snaps }))).not.toContain("New submission.");
+  });
+  it("reopened screening: the decided submission and its decision are marked superseded, and a later submission is a new one", () => {
+    const base = { withdrawn: false, withdrawnAt: null, exact: true };
+    const old = { ...base, reopened: true, reopenedAt: "2026-11-08T12:00:00.000Z", replacedBySnapshotId: "s2", resubmissionOfSnapshotId: null, resubmissionAfter: null, resubmissionOfEndedAt: null };
+    const cur = { ...base, reopened: false, reopenedAt: null, replacedBySnapshotId: null, resubmissionOfSnapshotId: "s1", resubmissionAfter: "REOPENED" as const, resubmissionOfEndedAt: "2026-11-08T12:00:00.000Z" };
+    const snaps = [
+      { id: "s1", kind: "SCREENING_SUBMITTED", versionNumber: "1.0", takenAt: "2026-11-08T10:00:00.000Z", takenByName: "Alex Rowan", hash: "aaa", screeningSubmission: old },
+      { id: "s2", kind: "SCREENING_SUBMITTED", versionNumber: "1.0", takenAt: "2026-11-08T14:00:00.000Z", takenByName: "Alex Rowan", hash: "bbb", screeningSubmission: cur },
+    ];
+    const decision = { id: "sd1", dpoName: "Dana Whitfield", decision: "PROCEED_FULL", rationale: "Proceed", exceptionJustification: null, mitigationControls: null, advice: null, indicatedFull: false, superseded: true, versionNumber: "1.0", currentVersion: true, createdAt: "2026-11-08T11:00:00.000Z" };
+    const g = gov({ snapshots: snaps, screeningDecisions: [decision], screening: { fullDpiaIndicated: false, tiaIndicated: false, unresolved: [], snapshotId: "s2" }, state: { ...gov().state, screeningStatus: "AWAITING_DPO" } });
+    const html = review("owner", g, { screeningStatus: "AWAITING_DPO" });
+    expect(html).toContain("Superseded");
+    expect(html).toContain("New submission.");
+    expect(html).toContain("superseded when the screening was reopened");
+    expect(html).toContain("Only this submission is under review.");
+    const hist = history("owner", g);
+    expect(hist).toContain("Superseded: the screening was reopened for changes on");
+    expect(hist).toContain("The DPO’s decision on this submission is superseded");
+    expect(hist).toContain("a later submission");
+    // after the DPO decided the new submission the wording no longer says "under review"
+    const decided = review("owner", gov({ snapshots: snaps, screening: { fullDpiaIndicated: false, tiaIndicated: false, unresolved: [], snapshotId: "s2" }, state: { ...gov().state, screeningStatus: "DECIDED" } }), { screeningStatus: "DECIDED" });
+    expect(decided).toContain("The DPO’s decision applies to this submission.");
+    expect(decided).not.toContain("Only this submission is under review.");
+  });
+  it("after a reopening and before resubmitting, Review says the next submission will be new and labels the indications as superseded", () => {
+    const snaps = [{ id: "s1", kind: "SCREENING_SUBMITTED", versionNumber: "1.0", takenAt: "2026-11-08T10:00:00.000Z", takenByName: "Alex Rowan", hash: "aaa", screeningSubmission: { withdrawn: false, withdrawnAt: null, reopened: true, reopenedAt: "2026-11-08T12:00:00.000Z", replacedBySnapshotId: null, resubmissionOfSnapshotId: null, resubmissionAfter: null, resubmissionOfEndedAt: null, exact: true } }];
+    const g = gov({ snapshots: snaps, screening: { fullDpiaIndicated: false, tiaIndicated: false, unresolved: [], snapshotId: "s1" }, state: { ...gov().state, screeningStatus: "INVALIDATED" } });
+    const html = review("owner", g, { screeningStatus: "INVALIDATED" });
+    expect(html).toContain("The next submission will be a new submission for the DPO to review.");
+    expect(html).toContain("Screening indications at the superseded submission");
+    expect(html).toContain("Submit pre-assessment for DPO review");
+  });
+  it("the owner's reopen button is offered only for a decided screening, and the confirmation is asked in the page", () => {
+    const decided = gov({ state: { ...gov().state, screeningStatus: "DECIDED", path: "FULL" } });
+    const html = review("owner", decided, { screeningStatus: "DECIDED" });
+    expect(html).toContain("Reopen screening for changes");
+    expect(html).not.toContain('data-testid="inline-confirm"'); // not shown until the button is pressed
+    expect(review("owner", gov(), { screeningStatus: "NOT_SUBMITTED" })).not.toContain("Reopen screening for changes");
+    expect(review("dpo", decided, { screeningStatus: "DECIDED" })).not.toContain("Reopen screening for changes");
+    const confirm = renderToString(<InlineConfirm message="Reopen the screening?" onYes={() => undefined} onCancel={() => undefined} />);
+    expect(confirm).toContain('data-testid="inline-confirm"');
+    expect(confirm).toContain("Reopen the screening?");
+    expect(confirm).toContain("Yes, continue");
+    expect(confirm).toContain("Cancel");
+  });
+  it("governance actions no longer depend on the browser's own confirm dialog (a blocked dialog made the action silently do nothing)", () => {
+    const src = readFileSync(path.resolve(__dirname, "../src/components/form/Governance.tsx"), "utf8");
+    expect(src).not.toMatch(/window\.confirm\(/);
   });
   it("shows a recorded departure from the DPO's opinion prominently", () => {
     const g = gov({ ownerDecisions: [{ id: "d", ownerName: "Alex Rowan", decision: "APPROVED", rationale: "Approved.", departsFromDpo: true, departureRationale: "We accept the residual risk.", supersedesId: null, reviewedSnapshotId: "s", versionNumber: "1.0", currentVersion: true, createdAt: "2026-11-08T12:00:00.000Z" }] });

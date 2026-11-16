@@ -339,6 +339,64 @@ describe("screening withdrawal, resubmission and stale DPO decisions", () => {
   });
 });
 
+describe("reopening a decided screening (reproduction of the owner's report)", () => {
+  it("submit, withdraw, resubmit, DPO proceeds, owner reopens: the decision is superseded, the questionnaire becomes editable and a resubmission is a new snapshot", async () => {
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    await act(owner, { action: "withdrawScreening" });
+    await act(owner, { action: "submitScreening" });
+    const decided = currentSubmission();
+    await act(dpo1, { action: "recordScreeningDecision", snapshotId: decided, decision: "PROCEED_FULL", rationale: "Proceed" });
+    expect(A()).toMatchObject({ screeningStatus: "DECIDED", screeningPath: "FULL", lifecycle: "DRAFT" });
+    // while decided, sections 1 to 3 are locked for the owner (the correct, documented behaviour)
+    expect(await save(owner, "C.q1.rationale", "locked while decided")).toBe("rejected");
+    const before = JSON.stringify(table("snapshot"));
+    // the reopen action
+    expect(await status(act(owner, { action: "reopenScreening" }))).toBe(200);
+    expect(A()).toMatchObject({ screeningStatus: "INVALIDATED", screeningPath: "OPEN", lifecycle: "DRAFT" });
+    expect(table("screeningDecision").map((d) => Boolean(d.supersededAt))).toEqual([true]);
+    expect(JSON.stringify(table("snapshot"))).toBe(before); // snapshots untouched
+    // sections 1 to 3 are editable again
+    expect(await save(owner, "C.q1.rationale", "edited after reopening")).toBe("saved");
+    expect(await save(owner, "A.description", "edited after reopening")).toBe("saved");
+    // resubmitting creates a new snapshot for the DPO
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    expect(currentSubmission()).not.toBe(decided);
+    expect(A().screeningStatus).toBe("AWAITING_DPO");
+    // the earlier decision stays in history and is marked superseded, and the old snapshot is marked as ended by the reopening
+    const g = await loadGovernance(owner, id);
+    expect(g.screeningDecisions[0]).toMatchObject({ superseded: true });
+    expect(g.snapshots.find((x) => x.id === decided)!.screeningSubmission).toMatchObject({ reopened: true, replacedBySnapshotId: currentSubmission() });
+    expect(g.snapshots.find((x) => x.id === currentSubmission())!.screeningSubmission).toMatchObject({ resubmissionOfSnapshotId: decided, resubmissionAfter: "REOPENED" });
+    // a stale DPO page on the decided submission cannot decide on the new one
+    expect(await status(act(dpo1, { action: "recordScreeningDecision", snapshotId: decided, decision: "PROCEED_FULL", rationale: "Old" }))).toBe(409);
+  });
+
+  it("an older reopening event without a snapshot id is still matched to the decided submission by time", async () => {
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    const first = currentSubmission();
+    await act(dpo1, { action: "recordScreeningDecision", snapshotId: first, decision: "PROCEED_FULL", rationale: "Proceed" });
+    await act(owner, { action: "reopenScreening" });
+    expect(table("event").find((e) => e.type === "SCREENING_REOPENED")?.payload).toMatchObject({ snapshotId: first });
+    table("event").find((e) => e.type === "SCREENING_REOPENED")!.payload = { previousPath: "FULL" }; // as recorded before the snapshot id was added
+    const g = await loadGovernance(owner, id);
+    expect(g.snapshots.find((x) => x.id === first)!.screeningSubmission).toMatchObject({ reopened: true, exact: false });
+  });
+
+  it("reopening is refused for other roles and for a screening that is not decided", async () => {
+    completeAll();
+    await act(owner, { action: "submitScreening" });
+    expect(await status(act(owner, { action: "reopenScreening" }))).toBe(409); // awaiting the DPO: withdraw instead
+    const snapshotId = currentSubmission();
+    await act(dpo1, { action: "recordScreeningDecision", snapshotId, decision: "PROCEED_FULL", rationale: "Proceed" });
+    expect(await status(act(dpo1, { action: "reopenScreening" }))).toBe(403);
+    expect(await status(act(contrib, { action: "reopenScreening" }))).toBe(404);
+    expect(A().screeningStatus).toBe("DECIDED");
+  });
+});
+
 describe("full review gate", () => {
   it("cannot be submitted before the DPO decides to proceed", async () => {
     completeAll();

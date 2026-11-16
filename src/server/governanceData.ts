@@ -12,7 +12,7 @@ import { buildModel, evaluateAssessment } from "@/domain/model";
 import { SCREENING_SUBSECTIONS, rolesOf, submissionBlockers, type Path } from "@/domain/workflow";
 import type { SnapshotPayload } from "@/domain/snapshot";
 import { isVersionRejected } from "@/lib/labels";
-import { deriveScreeningSubmissions } from "@/domain/submissions";
+import { SUBMISSION_EVENT_TYPES, deriveScreeningSubmissions } from "@/domain/submissions";
 import { load, stateOf } from "./governance";
 
 const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
@@ -246,7 +246,7 @@ export async function screeningSubmissionInfo(
   snaps?: { id: string; kind: string; versionId: string; takenAt: Date }[],
 ) {
   const snapshots = snaps ?? (await prisma.snapshot.findMany({ where: { assessmentId }, select: { id: true, kind: true, versionId: true, takenAt: true } }));
-  const events = await prisma.event.findMany({ where: { assessmentId, type: "SCREENING_WITHDRAWN" }, orderBy: { createdAt: "asc" } });
+  const events = await prisma.event.findMany({ where: { assessmentId, type: { in: SUBMISSION_EVENT_TYPES } }, orderBy: { createdAt: "asc" } });
   return deriveScreeningSubmissions(
     snapshots.map((s) => ({ id: s.id, kind: s.kind, versionId: s.versionId, takenAt: s.takenAt.toISOString() })),
     events.map((e) => ({ type: e.type, versionId: e.versionId, createdAt: e.createdAt.toISOString(), payload: (e.payload as Record<string, unknown> | null) ?? null })),
