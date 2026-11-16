@@ -125,6 +125,19 @@ Scope: the owner hint, the withdrawn / resubmitted labelling and the DPO decisio
 
 Limits: one browser pane shares the demo-identity cookie, so the "separate DPO session" was emulated by keeping the DPO's page open in one tab while the owner's actions ran in another tab; the request used whichever identity was current at the click (the DPO). The browser blocks native confirmation dialogs, so confirmations were accepted by script. Older withdrawal events without a snapshot id (the "matched by time" path) were covered by local tests only, because every withdrawal here was recorded after the change. Server-side refusal of other denied actions remains untested on Railway.
 
+## Stage 4 verification on Railway: Test 4, in-page confirmation and reopening a decided screening (commit `46adf0b`, 2026-11-16)
+
+Assessment: "TEST Stage 4b withdrawal verification (fictional)". Earlier the owner's "Reopen screening for changes" did nothing: the live history had no reopen event and the status stayed "Screening decided", consistent with the browser's own confirm() dialog being dismissed or blocked. Confirmations now appear in the page ("Yes, continue" / "Cancel").
+
+| Check | Result | Basis |
+|---|---|---|
+| The prompt appears and "Cancel" changes nothing | Pass | Observed by the assistant on Railway: prompt text and both buttons shown; after Cancel the status stayed "Screening decided" and the history still had 7 events with no reopen event |
+| "Yes, continue" reopens the screening | Pass | Reported by the project owner (manual test); not observed by the assistant |
+| Status becomes "Screening decision invalidated"; the old decision is marked "Superseded"; the decided snapshot is marked as superseded by the reopening | Pass | Reported by the project owner |
+| Sections 1 to 3 are editable again and "Save draft" works | Pass | Reported by the project owner |
+
+Not reported or not checked: resubmitting after the reopening (new snapshot, "New submission… superseded when the screening was reopened"), the History page with four snapshots, and the old snapshot's content being unchanged. The "Yes, continue" path was not exercised by the assistant, and the other ten confirmations that now use the same component (record decision, reopen for changes, confirm condition, mark/cancel assignment, remove view access, transfer ownership, archive, delete draft) were covered by local tests only.
+
 ## Stage 4 items that specifically need Railway verification
 
 - Migration `20261108000000_stage4_governance` applies cleanly at startup on the existing database and keeps all existing assessments and answers (the test assessment included).
