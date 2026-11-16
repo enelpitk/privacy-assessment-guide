@@ -113,7 +113,7 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
           <Items items={sub.items} recordId="" subsectionId={sub.id} evalCtx={model.ctx} />
         </form>
 
-        {screeningLocked ? null : <SectionComments subsectionId={sub.id} />}
+        {screeningLocked || sub.noComments ? null : <SectionComments subsectionId={sub.id} />}
         <nav className="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4" aria-label="Section navigation">
           {prev ? (
             <a

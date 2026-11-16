@@ -35,6 +35,7 @@ export const STAGE_A: StageDef = {
       stage: "A",
       title: "Processing",
       summary: "Name and a short description of the processing.",
+      noComments: true,
       intro:
         "A DPIA helps assess whether the processing of personal data is necessary and proportionate, and identifies potential risks to individuals’ rights and freedoms.",
       answerControls: "none",

@@ -154,3 +154,33 @@ describe("owner-only hint: how to change locked screening answers", () => {
     expect(hint(html("D1", page("owner", submitted)))).toBe(false);
   });
 });
+
+describe("1.1 Processing shows no comment blocks (display only)", () => {
+  const thread = {
+    id: "t1",
+    subsectionId: "A1",
+    fieldId: null,
+    recordId: null,
+    state: "OPEN" as const,
+    comments: [{ id: "c1", authorName: "Dana Whitfield", authorId: "d1", body: "A comment.", createdAt: "2026-11-08T10:00:00.000Z", parentId: null, isReview: true }],
+  };
+  it("the owner sees no 'Comment' links and no 'Comments on this section' on 1.1 in an editable draft", () => {
+    const h = html("A1", page("owner", { lifecycle: "DRAFT", screeningStatus: "NOT_SUBMITTED" }));
+    expect(hasQuestionComment(h)).toBe(false);
+    expect(hasSectionComments(h)).toBe(false);
+    expect(h).toContain("Name of the processing"); // the answers stay
+  });
+  it("the DPO and a contributor see none on 1.1 either, even when a thread exists (it stays stored, only the link is not shown)", () => {
+    const dpo = { ...page("dpo", { lifecycle: "DRAFT", screeningStatus: "NOT_SUBMITTED" }), threads: [thread] };
+    expect(hasSectionComments(html("A1", dpo))).toBe(false);
+    expect(hasQuestionComment(html("A1", page("assignee", { lifecycle: "DRAFT", screeningStatus: "NOT_SUBMITTED" })))).toBe(false);
+    expect(dpo.threads).toHaveLength(1);
+  });
+  it("other pages keep their comment blocks (1.2, 2.1 and 3.2) while editable", () => {
+    for (const sub of ["A2", "B1", "C1"]) {
+      const h = html(sub, page("owner", { lifecycle: "DRAFT", screeningStatus: "NOT_SUBMITTED" }));
+      expect(hasQuestionComment(h), sub).toBe(true);
+      expect(hasSectionComments(h), sub).toBe(true);
+    }
+  });
+});
