@@ -88,6 +88,7 @@ export const STAGE_A: StageDef = {
       answerControls: "none",
       noAbout: true,
       guidanceInsteadOfAbout: true,
+      noComments: true,
       items: [
         multi(
           "A.reason",

@@ -155,7 +155,7 @@ describe("owner-only hint: how to change locked screening answers", () => {
   });
 });
 
-describe("1.1 Processing shows no comment blocks (display only)", () => {
+describe("1.1 Processing and 1.2 Reason show no comment blocks (display only)", () => {
   const thread = {
     id: "t1",
     subsectionId: "A1",
@@ -176,8 +176,17 @@ describe("1.1 Processing shows no comment blocks (display only)", () => {
     expect(hasQuestionComment(html("A1", page("assignee", { lifecycle: "DRAFT", screeningStatus: "NOT_SUBMITTED" })))).toBe(false);
     expect(dpo.threads).toHaveLength(1);
   });
-  it("other pages keep their comment blocks (1.2, 2.1 and 3.2) while editable", () => {
-    for (const sub of ["A2", "B1", "C1"]) {
+  it("1.2 Reason for the assessment shows no comment links and no section comments for the owner, the DPO or a contributor", () => {
+    const ctx = { lifecycle: "DRAFT" as const, screeningStatus: "NOT_SUBMITTED" as const };
+    for (const who of ["owner", "dpo", "assignee"] as const) {
+      const h = html("A2", page(who, ctx));
+      expect(hasQuestionComment(h), who).toBe(false);
+      expect(hasSectionComments(h), who).toBe(false);
+    }
+    expect(html("A2", page("owner", ctx))).toContain("Reason for the DPIA"); // the answers stay
+  });
+  it("other pages keep their comment blocks (2.1 and 3.2) while editable", () => {
+    for (const sub of ["B1", "C1"]) {
       const h = html(sub, page("owner", { lifecycle: "DRAFT", screeningStatus: "NOT_SUBMITTED" }));
       expect(hasQuestionComment(h), sub).toBe(true);
       expect(hasSectionComments(h), sub).toBe(true);
