@@ -186,6 +186,23 @@ describe("1 Processing and Reason: no answer options", () => {
     expect(render("A1", pageStub())).toContain("Name of the processing");
     expect(render("A1", pageStub())).toContain("General description - brief summary of what the processing involves");
   });
+  it("1.2 has no 'About this section' panel; its text is a collapsed 'Guidance' directly under the section heading", () => {
+    const html = render("A2", pageStub()).replace(/<!-- -->/g, "");
+    expect(html).not.toContain("About this section");
+    expect(html).not.toContain("aria-label=\"About this section\"");
+    const m = /<details([^>]*)><summary[^>]*>Guidance<\/summary><div[^>]*><p>([^<]*)<\/p>/.exec(html);
+    expect(m).not.toBeNull();
+    expect(m![1]).not.toContain("open"); // collapsed by default
+    expect(m![2]).toBe("Why a DPIA is being done and what has changed, if anything.");
+    const at = html.indexOf(">Guidance<");
+    expect(at).toBeGreaterThan(html.indexOf("Reason for the assessment"));
+    expect(at).toBeLessThan(html.indexOf("Reason for the DPIA"));
+    expect((html.match(/>Guidance</g) ?? []).length).toBeGreaterThanOrEqual(1);
+  });
+  it("other sections keep their 'About this section' panel (1.1 and 2.2 are unchanged)", () => {
+    expect(render("A1", pageStub())).toContain("About this section");
+    expect(render("B2", pageStub())).toContain("About this section");
+  });
   it("removes 'Select all that apply' and the manual-entry sentence but keeps the previous reference field", () => {
     const html = render("A2", pageStub());
     expect(html).not.toContain("Select all that apply");

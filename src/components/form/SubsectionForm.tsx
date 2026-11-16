@@ -69,6 +69,12 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
         <h2 className="mt-0.5 text-lg font-semibold">
           {subsectionLabel(sub.id)} {sub.title}
         </h2>
+        {sub.noAbout && sub.guidanceInsteadOfAbout ? (
+          <details className="mt-1 text-sm">
+            <summary className="w-fit cursor-pointer text-brand-700">Guidance</summary>
+            <HelpPanel summary={sub.summary} intro={sub.intro} help={sub.help} />
+          </details>
+        ) : null}
         <CarriedForward subsectionId={sub.id} />
 
         {!active ? (

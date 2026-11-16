@@ -164,6 +164,8 @@ export interface SubsectionDef {
   answerControls?: "field" | "none" | "help";
   /** Do not show the collapsible "About this section" panel. */
   noAbout?: boolean;
+  /** With noAbout: show the text of the "About this section" panel as a collapsed "Guidance" under the section heading instead. */
+  guidanceInsteadOfAbout?: boolean;
 }
 
 export interface StageDef {

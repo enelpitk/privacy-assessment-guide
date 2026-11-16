@@ -85,6 +85,8 @@ export const STAGE_A: StageDef = {
       title: "Reason for the assessment",
       summary: "Why a DPIA is being done and what has changed, if anything.",
       answerControls: "none",
+      noAbout: true,
+      guidanceInsteadOfAbout: true,
       items: [
         multi(
           "A.reason",
