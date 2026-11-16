@@ -16,7 +16,6 @@ import {
 } from "@/domain/guidance";
 import { interpretYesNo } from "@/domain/model";
 import { isEmptyValue } from "@/domain/validation";
-import { FieldComments } from "./Comments";
 import { useStoreCtx, useStoreRev } from "./context";
 import type { FieldState } from "./store";
 
@@ -142,7 +141,6 @@ export function FieldBlock({
         <HelpRequest def={def} recordId={recordId} disabled={disabled} />
         {f?.status === "conflict" ? <ConflictPanel def={def} f={f} recordId={recordId} /> : null}
         <FieldMeta f={f} />
-        {screeningLocked ? null : <FieldComments subsectionId={subsectionId} fieldId={def.id} recordId={recordId} />}
       </div>
     );
   }

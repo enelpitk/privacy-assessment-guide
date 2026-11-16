@@ -139,7 +139,7 @@ describe("owner-only hint: how to change locked screening answers", () => {
   });
 });
 
-describe("the questionnaire shows no comment UI (display only); the help request keeps its own thread link", () => {
+describe("the questionnaire shows no comment UI (display only); the help request itself is unchanged", () => {
   const thread = {
     id: "t1",
     subsectionId: "A1",
@@ -175,12 +175,14 @@ describe("the questionnaire shows no comment UI (display only); the help request
     expect(h).not.toContain("Comments on this section (1");
     expect(p.threads).toHaveLength(1);
   });
-  it("sections with a 'Not sure - I need help' request keep that request and its own thread link (2.1 and 2.2)", () => {
+  it("sections with a 'Not sure - I need help' request keep that request and show no Comment link under it (2.1 and 2.2)", () => {
     for (const sub of ["B1", "B2"]) {
       const h = html(sub, page("owner", ctx));
       expect(h, sub).toContain("Not sure – I need help");
       expect(hasSectionComments(h), sub).toBe(false);
-      expect((h.match(/>Comment</g) ?? []).length, sub).toBe(1); // only the help request's thread link
+      expect(hasQuestionComment(h), sub).toBe(false);
+      expect(h, sub).toContain("I need help with this section");
+      expect(h, sub).toContain("Comment (optional)"); // the help request's own comment field stays
     }
   });
 });
