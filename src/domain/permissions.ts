@@ -73,6 +73,14 @@ const PROGRESS_LIFECYCLES: Lifecycle[] = [
 ];
 const SCREENING_STAGES = ["A", "B", "C"];
 
+/** The reason given when a submitted screening section (1 to 3) is locked while the assessment is otherwise editable. */
+export const SCREENING_LOCK_REASON = "The submitted screening sections are locked.";
+
+/** True when a permission decision is the submitted-screening lock. Used only to simplify what is shown; it never grants anything. */
+export function isScreeningLock(d: Decision): boolean {
+  return !d.ok && d.reason === SCREENING_LOCK_REASON;
+}
+
 export interface FieldPerm {
   id: string;
   changeClass: ChangeClass;
@@ -123,7 +131,7 @@ export function canEditField(
     SCREENING_STAGES.includes(stage) &&
     (ctx.screeningStatus === "AWAITING_DPO" || ctx.screeningStatus === "DECIDED")
   ) {
-    return no("The submitted screening sections are locked.");
+    return no(SCREENING_LOCK_REASON);
   }
   return yes;
 }

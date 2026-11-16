@@ -4,7 +4,7 @@ import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { changeClassOf, subsectionById, subsectionLabel, type FieldDef } from "@/content";
 import type { AnswerState, EvalCtx } from "@/domain/conditions";
 import { evaluate } from "@/domain/conditions";
-import { canEditField } from "@/domain/permissions";
+import { canEditField, isScreeningLock } from "@/domain/permissions";
 import { describeRisk, riskCategory, riskScore } from "@/domain/risk";
 import {
   CONTROLLER_CHOICES,
@@ -126,6 +126,9 @@ export function FieldBlock({
     subsectionId,
   );
   const disabled = !perm.ok;
+  // In the submitted screening view the answers are shown plainly: no comment links and no read-only line.
+  // Access control is unchanged; this only hides those elements.
+  const screeningLocked = isScreeningLock(perm);
   const mode = subsectionById.get(subsectionId)?.answerControls ?? "field";
   const inputId = `${uid}-in`;
   const helpId = `${uid}-help`;
@@ -139,7 +142,7 @@ export function FieldBlock({
         <HelpRequest def={def} recordId={recordId} disabled={disabled} />
         {f?.status === "conflict" ? <ConflictPanel def={def} f={f} recordId={recordId} /> : null}
         <FieldMeta f={f} />
-        <FieldComments subsectionId={subsectionId} fieldId={def.id} recordId={recordId} />
+        {screeningLocked ? null : <FieldComments subsectionId={subsectionId} fieldId={def.id} recordId={recordId} />}
       </div>
     );
   }
@@ -360,8 +363,8 @@ export function FieldBlock({
       ) : null}
       {f?.status === "conflict" ? <ConflictPanel def={def} f={f} recordId={recordId} /> : null}
       <FieldMeta f={f} />
-      <FieldComments subsectionId={subsectionId} fieldId={def.id} recordId={recordId} />
-      {!perm.ok ? <p className="help-text mt-1">Read-only: {perm.reason}</p> : null}
+      {screeningLocked ? null : <FieldComments subsectionId={subsectionId} fieldId={def.id} recordId={recordId} />}
+      {!perm.ok && !screeningLocked ? <p className="help-text mt-1">Read-only: {perm.reason}</p> : null}
     </>
   );
 

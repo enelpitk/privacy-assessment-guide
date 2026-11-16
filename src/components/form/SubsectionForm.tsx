@@ -14,7 +14,7 @@ import {
   type Item,
 } from "@/content";
 import type { EvalCtx } from "@/domain/conditions";
-import { canChangeRecords } from "@/domain/permissions";
+import { canChangeRecords, isScreeningLock } from "@/domain/permissions";
 import {
   buildModel,
   isItemActive,
@@ -57,6 +57,8 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
   const stage = STAGES.find((s) => s.id === sub.stage)!;
   const active = isSubsectionActive(sub, model.ctx);
   const canStructure = canChangeRecords(page.actor, page.ctx, sub.id);
+  // Submitted screening view: no lock notice and no section comments link (access control is unchanged).
+  const screeningLocked = isScreeningLock(canStructure);
 
   return (
     <div className={`grid gap-5 ${sub.noAbout ? "" : "lg:grid-cols-[minmax(0,1fr)_auto]"}`}>
@@ -77,7 +79,7 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
             </p>
           </div>
         ) : null}
-        {!canStructure.ok ? (
+        {!canStructure.ok && !screeningLocked ? (
           <p className="mt-3 max-w-prose2 rounded-md border border-slate-300 bg-slate-100 p-2 text-sm" role="status">
             You can read this section but not edit it. {canStructure.reason}
           </p>
@@ -93,7 +95,7 @@ export function SubsectionForm({ subsectionId }: { subsectionId: string }) {
           <Items items={sub.items} recordId="" subsectionId={sub.id} evalCtx={model.ctx} />
         </form>
 
-        <SectionComments subsectionId={sub.id} />
+        {screeningLocked ? null : <SectionComments subsectionId={sub.id} />}
         <nav className="mt-6 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-4" aria-label="Section navigation">
           {prev ? (
             <a
