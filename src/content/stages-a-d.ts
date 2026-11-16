@@ -178,6 +178,8 @@ export const STAGE_B: StageDef = {
       title: "Processors and sub-processors",
       summary: "Who processes personal data on the controller’s behalf.",
       answerControls: "help",
+      noAbout: true,
+      guidanceInsteadOfAbout: true,
       covers: ["B.proc.guidance", "B.proc.example", "B.rows.addAsNeeded"],
       help: {
         explain:
@@ -186,11 +188,6 @@ export const STAGE_B: StageDef = {
           "Illustration only: a group insurer (controller) uses a group bank (processor) to run payroll services. The bank in turn uses an external hosting provider, which makes the provider a sub-processor.",
       },
       items: [
-        field("B2.help", "Not sure – I need help", "flag", {
-          added: true,
-          optional: true,
-          helpRequest: true,
-        }),
         flag("B.proc.none", "No processors are involved", {
           completeWhen: { hasRecords: "B.proc" },
         }),
@@ -199,7 +196,7 @@ export const STAGE_B: StageDef = {
           "Processors",
           "Processor",
           [
-            entity("B.proc.name", "Processor name", "PARTY", { noSuggestions: true }),
+            entity("B.proc.name", "Processor name", "PARTY", { noSuggestions: true, ui: "dropdown" }),
             longtext("B.proc.role", "Roles and responsibilities"),
             link("B.proc.dpaRef", "Data processing agreement (DPA) reference", {
               help: { inline: "Optional text or link to where the agreement is kept." },
@@ -209,21 +206,27 @@ export const STAGE_B: StageDef = {
               "Sub-processors",
               "Sub-processor",
               [
-                entity("B.sub.name", "Sub-processor name", "PARTY", { noSuggestions: true }),
+                entity("B.sub.name", "Sub-processor name", "PARTY", { noSuggestions: true, ui: "dropdown" }),
                 longtext("B.sub.role", "Roles and responsibilities"),
                 link("B.sub.dpaRef", "Data processing agreement (DPA) reference"),
               ],
-              { compact: true, titleField: "B.sub.name", addLabel: "+ Add sub-processor" },
+              { compact: true, titleField: "B.sub.name", addLabel: "+ Add Sub-processor" },
             ),
           ],
           {
             compact: true,
             collapsible: true,
             titleField: "B.proc.name",
-            addLabel: "+ Add processor",
+            addLabel: "+ Add Processor",
             activeWhen: { not: { f: "B.proc.none", eq: true } },
           },
         ),
+        // The help request closes the section, after the entries and their add controls (as in 2.1 Controllers).
+        field("B2.help", "Not sure – I need help", "flag", {
+          added: true,
+          optional: true,
+          helpRequest: true,
+        }),
       ],
     },
   ],

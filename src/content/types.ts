@@ -84,8 +84,11 @@ export interface FieldDef {
   helpRequest?: boolean;
   /** Hide the suggestion list in the entity picker. */
   noSuggestions?: boolean;
-  /** Render a single entity as a single-select control. */
-  ui?: "select";
+  /**
+   * "select": a single-select control with the group entities (controllers).
+   * "dropdown": the usual entity picker, but "Choose an existing entity" is a dropdown (group entities plus existing entries).
+   */
+  ui?: "select" | "dropdown";
 }
 
 export interface CollectionDef {

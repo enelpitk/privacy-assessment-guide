@@ -818,7 +818,51 @@ function EntityPicker({
       ) : null}
       {!disabled ? (
         <>
-          {unselected.length ? (
+          {def.ui === "dropdown" ? (
+            <div>
+              <label className="text-sm font-medium" htmlFor={`${def.id}-${recordId}-pick`}>
+                Choose an existing entity
+              </label>
+              <select
+                id={`${def.id}-${recordId}-pick`}
+                className="input mt-1"
+                value=""
+                disabled={busy}
+                onChange={async (e) => {
+                  const v = e.target.value;
+                  setMsg(null);
+                  if (!v) return;
+                  if (v.startsWith("new:")) {
+                    await addByName(v.slice(4));
+                  } else {
+                    choose(v);
+                  }
+                }}
+              >
+                <option value="">Select…</option>
+                {CONTROLLER_CHOICES.map((c) => {
+                  const ex = all.find((x) => x.name.toLowerCase() === c.toLowerCase());
+                  if (ex && selected.includes(ex.id)) return null;
+                  return (
+                    <option key={c} value={ex ? ex.id : `new:${c}`}>
+                      {c}
+                    </option>
+                  );
+                })}
+                {unselected.filter((x) => !CONTROLLER_CHOICES.some((c) => c.toLowerCase() === x.name.toLowerCase())).length ? (
+                  <optgroup label="Existing entries">
+                    {unselected
+                      .filter((x) => !CONTROLLER_CHOICES.some((c) => c.toLowerCase() === x.name.toLowerCase()))
+                      .map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name}
+                        </option>
+                      ))}
+                  </optgroup>
+                ) : null}
+              </select>
+            </div>
+          ) : unselected.length ? (
             <div>
               <p className="text-sm font-medium">Choose an existing entry</p>
               <div className="mt-1 flex flex-wrap gap-2">
@@ -844,7 +888,7 @@ function EntityPicker({
           ) : null}
           <div>
             <label className="text-sm font-medium" htmlFor={`${def.id}-${recordId}-new`}>
-              Add a new entry
+              {def.ui === "dropdown" ? "Add a new entity" : "Add a new entry"}
             </label>
             <div className="mt-1 flex gap-2">
               <input

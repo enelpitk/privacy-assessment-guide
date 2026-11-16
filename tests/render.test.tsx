@@ -199,9 +199,9 @@ describe("1 Processing and Reason: no answer options", () => {
     expect(at).toBeLessThan(html.indexOf("Reason for the DPIA"));
     expect((html.match(/>Guidance</g) ?? []).length).toBeGreaterThanOrEqual(1);
   });
-  it("other sections keep their 'About this section' panel (1.1 and 2.2 are unchanged)", () => {
+  it("other sections keep their 'About this section' panel (1.1 and 3.2 are unchanged)", () => {
     expect(render("A1", pageStub())).toContain("About this section");
-    expect(render("B2", pageStub())).toContain("About this section");
+    expect(render("C1", pageStub())).toContain("About this section");
   });
   it("removes 'Select all that apply' and the manual-entry sentence but keeps the previous reference field", () => {
     const html = render("A2", pageStub());
@@ -306,9 +306,78 @@ describe("2.2 Processors", () => {
     expect(i("Processor name")).toBeLessThan(i("Roles and responsibilities"));
     expect(i("Roles and responsibilities")).toBeLessThan(i("Data processing agreement (DPA) reference"));
     expect(i("Data processing agreement (DPA) reference")).toBeLessThan(i("Sub-processor 1"));
-    expect(html).toContain("+ Add processor");
-    expect(html).toContain("+ Add sub-processor");
+    expect(html).toContain("+ Add Processor");
+    expect(html).toContain("+ Add Sub-processor");
+    expect(html).not.toContain("+ Add processor");
+    expect(html).not.toContain("+ Add sub-processor");
     expect(html).toContain("Processor 1");
+    expect(html).toContain("Sub-processor 1");
+  });
+  it("has no 'About this section' button; its text is a collapsed Guidance under the heading, above the checkbox", () => {
+    const html = render("B2", page()).replace(/<!-- -->/g, "");
+    expect(html).not.toContain("About this section");
+    const m = /<details([^>]*)><summary[^>]*>Guidance<\/summary><div[^>]*>([\s\S]*?)<\/div><\/details>/.exec(html);
+    expect(m).not.toBeNull();
+    expect(m![1]).not.toContain("open"); // collapsed by default
+    expect(m![2]).toContain("Who processes personal data on the controller’s behalf.");
+    expect(m![2]).toContain("A processor processes personal data on behalf of a controller.");
+    expect(m![2]).toContain("Example (guidance, not your answer):");
+    const i = (t: string) => html.indexOf(t);
+    expect(i(">Guidance<")).toBeGreaterThan(i("2.2 Processors and sub-processors"));
+    expect(i(">Guidance<")).toBeLessThan(i("No processors are involved")); // the checkbox stays directly below Guidance
+  });
+  it("puts the 'Not sure - I need help' panel at the bottom, after the entries and their add controls", () => {
+    const html = render("B2", page()).replace(/<!-- -->/g, "");
+    const help = html.indexOf("Not sure – I need help");
+    expect(html.match(/Not sure – I need help/g)).toHaveLength(1);
+    expect(help).toBeGreaterThan(html.indexOf("+ Add Sub-processor"));
+    expect(help).toBeGreaterThan(html.indexOf("+ Add Processor"));
+    expect(help).toBeLessThan(html.indexOf("Save draft"));
+    expect(html.indexOf("No processors are involved")).toBeLessThan(html.indexOf("Processor 1")); // checkbox position unchanged
+  });
+  it("offers 'Choose an existing entity' as a dropdown with the group entities and existing entries, and keeps adding a new entity", () => {
+    const p = pageStub({
+      records: [{ id: "p1", collection: "B.proc", parentId: null, ordering: 0, revision: 1 }],
+      entities: [{ id: "e1", kind: "PARTY", name: "Acme Hosting", revision: 1 }],
+    });
+    const html = render("B2", p).replace(/<!-- -->/g, "");
+    expect(html).not.toContain("Choose an existing entry");
+    expect(html).toMatch(/<label[^>]*>Choose an existing entity<\/label><select/);
+    const select = /<select[^>]*>([\s\S]*?)<\/select>/.exec(html.slice(html.indexOf("Choose an existing entity")))![1];
+    expect(select).toContain("Select…");
+    expect(select).toContain("Harbour Insurance");
+    expect(select).toContain("Harbour Asset Management");
+    expect(select).toContain("Harbour Bank");
+    expect(select).toContain("Acme Hosting"); // an existing entity of this assessment
+    expect(html).toContain("Add a new entity");
+    expect(html).toContain("Rename or delete shared entries");
+  });
+  it("keeps a saved processor selection and the sub-processor under its processor", () => {
+    const p = pageStub({
+      records: [
+        { id: "p1", collection: "B.proc", parentId: null, ordering: 0, revision: 1 },
+        { id: "s1", collection: "B.sub", parentId: "p1", ordering: 0, revision: 1 },
+      ],
+      entities: [
+        { id: "e1", kind: "PARTY", name: "Acme Hosting", revision: 1 },
+        { id: "e2", kind: "PARTY", name: "Harbour Insurance", revision: 1 },
+      ],
+      fields: {
+        "B.proc.name|p1": { value: "e2", state: "ANSWERED", rationale: null, revision: 1, editorName: "A", lastEditedAt: "2026-11-07T10:00:00.000Z" },
+        "B.sub.name|s1": { value: "e1", state: "ANSWERED", rationale: null, revision: 1, editorName: "A", lastEditedAt: "2026-11-07T10:00:00.000Z" },
+      },
+    });
+    const html = render("B2", p).replace(/<!-- -->/g, "");
+    expect(html).toContain("Processor 1 — Harbour Insurance");
+    expect(html).toContain("Sub-processor 1 — Acme Hosting");
+    expect(html.indexOf("Processor 1 — Harbour Insurance")).toBeLessThan(html.indexOf("Sub-processor 1 — Acme Hosting"));
+    expect(html).toContain('aria-label="Selected entries"'); // the saved selections are shown
+  });
+  it("the dropdown is not offered to someone who cannot edit (read-only)", () => {
+    const p = pageStub({ actor: { id: "d1", roles: ["DPO"] }, records: [{ id: "p1", collection: "B.proc", parentId: null, ordering: 0, revision: 1 }] });
+    const html = render("B2", p);
+    expect(html).not.toContain("Choose an existing entity");
+    expect(html).not.toContain("+ Add Processor");
   });
   it("a help request shows as active but opening the control alone changes nothing", () => {
     const withHelp = pageStub({
